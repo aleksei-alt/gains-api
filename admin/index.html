@@ -254,19 +254,8 @@ td.muted { color: var(--muted); font-size: 13px; }
 </head>
 <body>
 
-<!-- Auth overlay -->
-<div class="auth-overlay" id="authOverlay">
-  <div class="auth-box">
-    <div class="auth-logo">GAINS</div>
-    <div class="auth-sub">ADMIN PANEL</div>
-    <input class="auth-input" type="password" id="tokenInput" placeholder="••••••••••" autocomplete="off">
-    <button class="auth-btn" onclick="doAuth()">Войти</button>
-    <div class="auth-err" id="authErr">Неверный токен</div>
-  </div>
-</div>
-
 <!-- Main app -->
-<div id="app" style="display:none">
+<div id="app">
   <div class="topbar">
     <div style="display:flex;align-items:center;gap:16px">
       <div class="logo">GAINS <span>ADMIN</span></div>
@@ -287,34 +276,11 @@ td.muted { color: var(--muted); font-size: 13px; }
 
 <script>
 const API = 'https://web-production-0031f.up.railway.app';
-let TOKEN = '';
-
-function doAuth() {
-  const val = document.getElementById('tokenInput').value.trim();
-  if (!val) return;
-  TOKEN = val;
-  // Test the token
-  fetch(`${API}/admin/stats?token=${encodeURIComponent(TOKEN)}`)
-    .then(r => {
-      if (r.status === 403) throw new Error('forbidden');
-      return r.json();
-    })
-    .then(data => {
-      document.getElementById('authOverlay').style.display = 'none';
-      document.getElementById('app').style.display = 'block';
-      localStorage.setItem('gains_admin_token', TOKEN);
-      renderStats(data);
-      loadUsers();
-    })
-    .catch(() => {
-      document.getElementById('authErr').style.display = 'block';
-    });
-}
 
 function loadData() {
   Promise.all([
-    fetch(`${API}/admin/stats?token=${encodeURIComponent(TOKEN)}`).then(r => r.json()),
-    fetch(`${API}/admin/users?token=${encodeURIComponent(TOKEN)}&limit=200`).then(r => r.json()),
+    fetch(`${API}/admin/stats`).then(r => r.json()),
+    fetch(`${API}/admin/users?limit=200`).then(r => r.json()),
   ]).then(([stats, users]) => {
     renderStats(stats);
     renderUsers(users);
@@ -323,7 +289,7 @@ function loadData() {
 }
 
 function loadUsers() {
-  fetch(`${API}/admin/users?token=${encodeURIComponent(TOKEN)}&limit=200`)
+  fetch(`${API}/admin/users?limit=200`)
     .then(r => r.json())
     .then(data => renderUsers(data));
 }
@@ -455,20 +421,11 @@ function renderUsers(data) {
   `;
 }
 
-// Try saved token
-const saved = localStorage.getItem('gains_admin_token');
-if (saved) {
-  TOKEN = saved;
-  document.getElementById('tokenInput').value = saved;
-  doAuth();
-}
-
-document.getElementById('tokenInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter') doAuth();
-});
+// Load on start
+loadData();
 
 // Auto-refresh every 60s
-setInterval(() => { if (TOKEN) loadData(); }, 60000);
+setInterval(loadData, 60000);
 </script>
 </body>
 </html>

@@ -878,16 +878,8 @@ async def telegram_webhook(request: Request):
     return {"ok": True}
 
 
-ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "gains-admin-2026")
-
-def _check_admin(token: str = ""):
-    if token != ADMIN_TOKEN:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=403, detail="forbidden")
-
 @app.get("/admin/stats")
-def admin_stats(token: str = ""):
-    _check_admin(token)
+def admin_stats():
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     with get_db() as conn:
         if USE_POSTGRES:
@@ -928,8 +920,7 @@ def admin_stats(token: str = ""):
     }
 
 @app.get("/admin/users")
-def admin_users(token: str = "", limit: int = 100, offset: int = 0):
-    _check_admin(token)
+def admin_users(limit: int = 100, offset: int = 0):
     sql = """
         SELECT u.tg_id, u.location, u.goal, u.level, u.days_per_week,
                u.body_weight, u.is_premium, u.premium_until, u.trial_start,
