@@ -420,17 +420,18 @@ def generate_workout(user: dict, history: list, split_day: str) -> str:
 Прогрессия: если упражнение есть в истории — увеличь вес на 2.5-5кг или повторения на 1-2.
 
 Верни ТОЛЬКО валидный JSON массив (без текста, без markdown):
-[{{"exercise":"Название","sets":3,"reps":10,"weight":60,"rest_seconds":90}}]
+[{{"exercise":"Название","sets":3,"reps":10,"weight":60,"rest_seconds":90,"tip":"Одна короткая фраза о технике выполнения."}}]
 
 Требования:
 - Строго 5-6 СИЛОВЫХ упражнений
 - ЗАПРЕЩЕНО: кардио, беговая дорожка, велотренажёр, эллипс
 - Соответствуй дню: {split_day}
-- Только конкретные числа"""
+- Только конкретные числа
+- tip: 1 предложение на русском — ключевой момент техники (не очевидный)"""
 
     response = client.messages.create(
         model="claude-haiku-4-5-20251001",
-        max_tokens=600,
+        max_tokens=900,
         messages=[{"role": "user", "content": prompt}]
     )
     raw = response.content[0].text.strip()

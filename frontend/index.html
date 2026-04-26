@@ -641,6 +641,74 @@
     .measure-item { font-size: 14px; color: var(--text-2); font-weight: 500; }
     .measure-item span { color: var(--accent); font-weight: 800; }
 
+    /* EXERCISE TIP */
+    .ex-tip-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      color: var(--text-3);
+      cursor: pointer;
+      margin-top: 8px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      transition: color 0.15s;
+      user-select: none;
+    }
+    .ex-tip-toggle:hover { color: var(--accent); }
+    .ex-tip-text {
+      font-size: 13px;
+      color: var(--text-2);
+      background: var(--surface);
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-top: 6px;
+      line-height: 1.5;
+      border-left: 2px solid var(--accent);
+    }
+
+    /* PROFILE EDIT */
+    .edit-modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.85);
+      z-index: 800;
+      display: flex; align-items: flex-end;
+    }
+    .edit-modal {
+      background: var(--surface);
+      border-radius: 24px 24px 0 0;
+      padding: 28px 20px 48px;
+      width: 100%;
+      animation: slideUp 0.3s cubic-bezier(0.34, 1.2, 0.64, 1);
+    }
+    .edit-modal-title {
+      font-size: 18px; font-weight: 800;
+      margin-bottom: 18px; letter-spacing: -0.3px;
+    }
+    .edit-option-row {
+      display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px;
+    }
+    .edit-chip {
+      background: var(--card);
+      border: 1.5px solid var(--border);
+      border-radius: 20px;
+      padding: 8px 16px;
+      font-size: 14px; font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      color: var(--text-2);
+    }
+    .edit-chip.active {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+    .edit-section-label {
+      font-size: 11px; color: var(--text-3);
+      font-weight: 700; letter-spacing: 0.8px;
+      text-transform: uppercase; margin-bottom: 8px;
+    }
+
     /* REST TIMER */
     .rest-timer {
       background: linear-gradient(135deg, #0c1800, #162500);
@@ -763,7 +831,7 @@
 
 <!-- ONBOARDING -->
 <div id="onboarding" class="screen active">
-  <div style="position:absolute;top:6px;right:10px;font-size:10px;opacity:0.25;color:white;z-index:99">v16</div>
+  <div style="position:absolute;top:6px;right:10px;font-size:10px;opacity:0.25;color:white;z-index:99">v17</div>
   <div>
     <div class="onboard-header">
       <div class="logo">GAINS</div>
@@ -1265,6 +1333,7 @@ function renderWorkout(data) {
           <input class="ex-input" type="number" id="weight-${i}" value="${ex.weight}" min="0" step="2.5">
         </div>
       </div>
+      ${ex.tip ? `<div><span class="ex-tip-toggle" onclick="toggleTip(${i})">ℹ️ Техника</span><div class="ex-tip-text" id="tip-${i}" style="display:none">${ex.tip}</div></div>` : ''}
       <button class="log-btn ${isLogged ? 'logged' : ''}" onclick="logExercise(${i}, '${ex.exercise}', ${ex.rest_seconds || 90})" ${isLogged ? 'disabled' : ''}>
         ${isLogged ? '✓ Записано' : 'Записать'}
       </button>
@@ -1454,25 +1523,40 @@ async function loadProfile() {
     </div>`;
   }
 
+  const locMap = {gym:'🏋️ В зале', home:'🏠 Дома'};
   document.getElementById('profile-content').innerHTML = `
     ${subHtml}
     <div class="profile-section">
-      <div class="profile-row">
+      <div class="profile-row" style="cursor:pointer" onclick="toggleLocation('${user.location}')">
+        <div class="profile-row-label">Место тренировок</div>
+        <div class="profile-row-value">${locMap[user.location] || user.location} →</div>
+      </div>
+      <div class="profile-row" style="cursor:pointer" onclick="showEditModal()">
         <div class="profile-row-label">Цель</div>
-        <div class="profile-row-value">${goalMap[user.goal] || user.goal}</div>
+        <div class="profile-row-value">${goalMap[user.goal] || user.goal} →</div>
       </div>
-      <div class="profile-row">
+      <div class="profile-row" style="cursor:pointer" onclick="showEditModal()">
         <div class="profile-row-label">Уровень</div>
-        <div class="profile-row-value">${levelMap[user.level] || user.level}</div>
+        <div class="profile-row-value">${levelMap[user.level] || user.level} →</div>
       </div>
-      <div class="profile-row">
+      <div class="profile-row" style="cursor:pointer" onclick="showEditModal()">
         <div class="profile-row-label">Дней в неделю</div>
-        <div class="profile-row-value">${user.days_per_week}</div>
+        <div class="profile-row-value">${user.days_per_week} →</div>
       </div>
       <div class="profile-row" style="cursor:pointer" onclick="changeNotifyTime(${user.notify_hour || 10})">
         <div class="profile-row-label">🔔 Уведомления</div>
         <div class="profile-row-value">${formatHour(user.notify_hour || 10)} →</div>
       </div>
+    </div>
+    <div style="margin-top:12px">
+      <button onclick="showEditModal()" style="width:100%;background:var(--card);border:1.5px solid var(--border2);border-radius:14px;padding:14px;color:var(--text-2);font-size:14px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">
+        ✏️ Изменить программу тренировок
+      </button>
+    </div>
+    <div style="margin-top:8px">
+      <button onclick="resetOnboarding()" style="width:100%;background:transparent;border:none;padding:12px;color:var(--text-3);font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">
+        Пройти настройку заново
+      </button>
     </div>`;
   } catch(e) { console.error('loadProfile error:', e); }
 }
@@ -1555,23 +1639,24 @@ async function loadMeasurements() {
 
   document.getElementById('measurements-content').innerHTML = `
     <div class="measure-form">
-      <div style="font-size:15px;font-weight:800;margin-bottom:14px;letter-spacing:-0.2px">Записать сегодня</div>
+      <div style="font-size:15px;font-weight:800;margin-bottom:4px;letter-spacing:-0.2px">Замеры тела</div>
+      <div style="font-size:12px;color:var(--text-3);margin-bottom:14px;font-weight:500">Раз в неделю достаточно — не нужно записывать каждую тренировку</div>
       <div class="measure-grid">
         <div class="measure-field">
           <label>Вес тела (кг)</label>
-          <input type="number" id="m-weight" step="0.1" placeholder="${last.body_weight || '70.0'}">
+          <input type="number" id="m-weight" step="0.1" value="${last.body_weight || ''}" placeholder="70.0">
         </div>
         <div class="measure-field">
           <label>Талия (см)</label>
-          <input type="number" id="m-waist" placeholder="${last.waist || '80'}">
+          <input type="number" id="m-waist" value="${last.waist || ''}" placeholder="80">
         </div>
         <div class="measure-field">
           <label>Бёдра (см)</label>
-          <input type="number" id="m-hips" placeholder="${last.hips || '95'}">
+          <input type="number" id="m-hips" value="${last.hips || ''}" placeholder="95">
         </div>
         <div class="measure-field">
           <label>Грудь (см)</label>
-          <input type="number" id="m-chest" placeholder="${last.chest || '90'}">
+          <input type="number" id="m-chest" value="${last.chest || ''}" placeholder="90">
         </div>
       </div>
       <button class="btn-primary" onclick="saveMeasurement()">Сохранить</button>
@@ -1605,6 +1690,95 @@ async function saveMeasurement() {
   }).catch(() => {});
   showToast('Замеры сохранены!', 'success');
   loadMeasurements();
+}
+
+function toggleTip(idx) {
+  const el = document.getElementById(`tip-${idx}`);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+async function toggleLocation(current) {
+  const next = current === 'gym' ? 'home' : 'gym';
+  try {
+    const user = await fetchWithTimeout(`${API}/users/${TG_ID}`).then(r => r.json());
+    await fetchWithTimeout(`${API}/users/setup`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ ...user, tg_id: TG_ID, location: next, days_per_week: user.days_per_week })
+    });
+    showToast(next === 'gym' ? '🏋️ Переключился на зал' : '🏠 Переключился на дом', 'success');
+    loadProfile();
+    state.workout = null;
+    loadToday();
+  } catch(e) { showToast('Ошибка', ''); }
+}
+
+function showEditModal() {
+  if (document.getElementById('edit-modal-overlay')) return;
+  fetchWithTimeout(`${API}/users/${TG_ID}`).then(r => r.json()).then(user => {
+    const el = document.createElement('div');
+    el.id = 'edit-modal-overlay';
+    el.className = 'edit-modal-overlay';
+    el.innerHTML = `
+      <div class="edit-modal">
+        <div class="edit-modal-title">Изменить программу</div>
+        <div class="edit-section-label">Цель</div>
+        <div class="edit-option-row" id="em-goal">
+          ${[['mass','Набор массы'],['strength','Сила'],['cut','Рельеф'],['weight_loss','Сбросить вес']].map(([v,l]) =>
+            `<div class="edit-chip ${user.goal===v?'active':''}" onclick="emSelect('goal','${v}',this)">${l}</div>`).join('')}
+        </div>
+        <div class="edit-section-label">Уровень</div>
+        <div class="edit-option-row" id="em-level">
+          ${[['beginner','Новичок'],['intermediate','Средний'],['advanced','Продвинутый']].map(([v,l]) =>
+            `<div class="edit-chip ${user.level===v?'active':''}" onclick="emSelect('level','${v}',this)">${l}</div>`).join('')}
+        </div>
+        <div class="edit-section-label">Дней в неделю</div>
+        <div class="edit-option-row" id="em-days">
+          ${[3,4,5].map(v =>
+            `<div class="edit-chip ${user.days_per_week===v?'active':''}" onclick="emSelect('days',${v},this)">${v} дня</div>`).join('')}
+        </div>
+        <button class="btn-primary" style="margin-top:8px" onclick="saveEditModal()">Сохранить</button>
+        <button onclick="document.getElementById('edit-modal-overlay').remove()" style="width:100%;background:transparent;border:none;padding:12px;color:var(--text-3);font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:4px">Отмена</button>
+      </div>`;
+    document.body.appendChild(el);
+    window._editState = { goal: user.goal, level: user.level, days: user.days_per_week, location: user.location, body_weight: user.body_weight, height: user.height, age: user.age, notify_hour: user.notify_hour || 10 };
+  });
+}
+
+function emSelect(field, val, el) {
+  el.closest('.edit-option-row').querySelectorAll('.edit-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  window._editState[field] = val;
+}
+
+async function saveEditModal() {
+  const s = window._editState;
+  try {
+    await fetchWithTimeout(`${API}/users/setup`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ tg_id: TG_ID, location: s.location, goal: s.goal, level: s.level, days_per_week: s.days, body_weight: s.body_weight, height: s.height, age: s.age, notify_hour: s.notify_hour })
+    });
+    document.getElementById('edit-modal-overlay')?.remove();
+    showToast('Программа обновлена ✓', 'success');
+    loadProfile();
+    state.workout = null;
+    loadToday();
+  } catch(e) { showToast('Ошибка сохранения', ''); }
+}
+
+function resetOnboarding() {
+  const ob = document.getElementById('onboarding');
+  const ap = document.getElementById('app');
+  if (ob) { ob.style.display = ''; ob.classList.add('active'); }
+  if (ap) ap.style.display = 'none';
+  state.currentStep = 'location';
+  document.querySelectorAll('.onboard-step').forEach(s => s.classList.remove('active'));
+  document.getElementById('step-location')?.classList.add('active');
+  document.querySelectorAll('.step-dot').forEach((d,i) => d.classList.toggle('active', i===0));
+  document.getElementById('onboard-next-btn').disabled = true;
+  document.getElementById('onboard-next-btn').textContent = 'Далее';
 }
 
 function showToast(msg, type = '') {
