@@ -888,43 +888,30 @@ def _check_admin(token: str = ""):
 @app.get("/admin/stats")
 def admin_stats(token: str = ""):
     _check_admin(token)
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     with get_db() as conn:
-        if IS_PG:
-            cur = conn.cursor()
-            cur.execute("SELECT COUNT(*) FROM users")
-            total_users = cur.fetchone()[0]
-            cur.execute("SELECT COUNT(*) FROM users WHERE is_premium=1 OR is_premium=true")
-            premium_users = cur.fetchone()[0]
-            cur.execute("SELECT COUNT(*) FROM users WHERE trial_start IS NOT NULL AND (is_premium=0 OR is_premium=false)")
-            trial_users = cur.fetchone()[0]
-            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-            cur.execute("SELECT COUNT(DISTINCT tg_id) FROM workouts WHERE date=%s", (today,))
-            active_today = cur.fetchone()[0]
-            cur.execute("SELECT COUNT(*) FROM workouts WHERE date=%s", (today,))
-            workouts_today = cur.fetchone()[0]
-            cur.execute("SELECT COUNT(*) FROM workouts")
-            total_workouts = cur.fetchone()[0]
-            cur.execute("SELECT COUNT(*) FROM exercise_logs")
-            total_logs = cur.fetchone()[0]
-            cur.execute("SELECT COUNT(*) FROM body_measurements")
-            total_measurements = cur.fetchone()[0]
-            # New users last 7 days
-            cur.execute("SELECT COUNT(*) FROM users WHERE created_at >= NOW() - INTERVAL '7 days'")
-            new_week = cur.fetchone()[0]
-            cur.execute("SELECT COUNT(*) FROM users WHERE created_at >= NOW() - INTERVAL '1 day'")
-            new_today = cur.fetchone()[0]
+        if USE_POSTGRES:
+            total_users = fetchone(conn, "SELECT COUNT(*) as c FROM users")["c"]
+            premium_users = fetchone(conn, "SELECT COUNT(*) as c FROM users WHERE is_premium=true")["c"]
+            trial_users = fetchone(conn, "SELECT COUNT(*) as c FROM users WHERE trial_start IS NOT NULL AND is_premium=false")["c"]
+            active_today = fetchone(conn, "SELECT COUNT(DISTINCT tg_id) as c FROM workouts WHERE date=%s", (today,))["c"]
+            workouts_today = fetchone(conn, "SELECT COUNT(*) as c FROM workouts WHERE date=%s", (today,))["c"]
+            total_workouts = fetchone(conn, "SELECT COUNT(*) as c FROM workouts")["c"]
+            total_logs = fetchone(conn, "SELECT COUNT(*) as c FROM exercise_logs")["c"]
+            total_measurements = fetchone(conn, "SELECT COUNT(*) as c FROM body_measurements")["c"]
+            new_week = fetchone(conn, "SELECT COUNT(*) as c FROM users WHERE created_at >= NOW() - INTERVAL '7 days'")["c"]
+            new_today = fetchone(conn, "SELECT COUNT(*) as c FROM users WHERE created_at >= NOW() - INTERVAL '1 day'")["c"]
         else:
-            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-            total_users = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-            premium_users = conn.execute("SELECT COUNT(*) FROM users WHERE is_premium=1").fetchone()[0]
-            trial_users = conn.execute("SELECT COUNT(*) FROM users WHERE trial_start IS NOT NULL AND is_premium=0").fetchone()[0]
-            active_today = conn.execute("SELECT COUNT(DISTINCT tg_id) FROM workouts WHERE date=?", (today,)).fetchone()[0]
-            workouts_today = conn.execute("SELECT COUNT(*) FROM workouts WHERE date=?", (today,)).fetchone()[0]
-            total_workouts = conn.execute("SELECT COUNT(*) FROM workouts").fetchone()[0]
-            total_logs = conn.execute("SELECT COUNT(*) FROM exercise_logs").fetchone()[0]
-            total_measurements = conn.execute("SELECT COUNT(*) FROM body_measurements").fetchone()[0]
-            new_week = conn.execute("SELECT COUNT(*) FROM users WHERE created_at >= date('now','-7 days')").fetchone()[0]
-            new_today = conn.execute("SELECT COUNT(*) FROM users WHERE created_at >= date('now','-1 day')").fetchone()[0]
+            total_users = fetchone(conn, "SELECT COUNT(*) as c FROM users")["c"]
+            premium_users = fetchone(conn, "SELECT COUNT(*) as c FROM users WHERE is_premium=1")["c"]
+            trial_users = fetchone(conn, "SELECT COUNT(*) as c FROM users WHERE trial_start IS NOT NULL AND is_premium=0")["c"]
+            active_today = fetchone(conn, "SELECT COUNT(DISTINCT tg_id) as c FROM workouts WHERE date=?", (today,))["c"]
+            workouts_today = fetchone(conn, "SELECT COUNT(*) as c FROM workouts WHERE date=?", (today,))["c"]
+            total_workouts = fetchone(conn, "SELECT COUNT(*) as c FROM workouts")["c"]
+            total_logs = fetchone(conn, "SELECT COUNT(*) as c FROM exercise_logs")["c"]
+            total_measurements = fetchone(conn, "SELECT COUNT(*) as c FROM body_measurements")["c"]
+            new_week = fetchone(conn, "SELECT COUNT(*) as c FROM users WHERE created_at >= date('now','-7 days')")["c"]
+            new_today = fetchone(conn, "SELECT COUNT(*) as c FROM users WHERE created_at >= date('now','-1 day')")["c"]
     return {
         "total_users": total_users,
         "premium_users": premium_users,
@@ -943,36 +930,19 @@ def admin_stats(token: str = ""):
 @app.get("/admin/users")
 def admin_users(token: str = "", limit: int = 100, offset: int = 0):
     _check_admin(token)
+    sql = """
+        SELECT u.tg_id, u.location, u.goal, u.level, u.days_per_week,
+               u.body_weight, u.is_premium, u.premium_until, u.trial_start,
+               u.created_at,
+               COUNT(DISTINCT w.id) as workout_count
+        FROM users u
+        LEFT JOIN workouts w ON w.tg_id = u.tg_id
+        GROUP BY u.tg_id
+        ORDER BY u.created_at DESC
+        LIMIT ? OFFSET ?
+    """
     with get_db() as conn:
-        if IS_PG:
-            cur = conn.cursor()
-            cur.execute("""
-                SELECT u.tg_id, u.location, u.goal, u.level, u.days_per_week,
-                       u.body_weight, u.is_premium, u.premium_until, u.trial_start,
-                       u.created_at,
-                       COUNT(DISTINCT w.id) as workout_count
-                FROM users u
-                LEFT JOIN workouts w ON w.tg_id = u.tg_id
-                GROUP BY u.tg_id
-                ORDER BY u.created_at DESC
-                LIMIT %s OFFSET %s
-            """, (limit, offset))
-            rows = cur.fetchall()
-            cols = [d[0] for d in cur.description]
-        else:
-            rows = conn.execute("""
-                SELECT u.tg_id, u.location, u.goal, u.level, u.days_per_week,
-                       u.body_weight, u.is_premium, u.premium_until, u.trial_start,
-                       u.created_at,
-                       COUNT(DISTINCT w.id) as workout_count
-                FROM users u
-                LEFT JOIN workouts w ON w.tg_id = u.tg_id
-                GROUP BY u.tg_id
-                ORDER BY u.created_at DESC
-                LIMIT ? OFFSET ?
-            """, (limit, offset)).fetchall()
-            cols = ["tg_id","location","goal","level","days_per_week","body_weight","is_premium","premium_until","trial_start","created_at","workout_count"]
-    users = [dict(zip(cols, r)) for r in rows]
+        users = fetchall(conn, sql, (limit, offset))
     return {"users": users, "total": len(users)}
 
 
