@@ -494,6 +494,8 @@ def log_exercise(data: ExerciseLog):
 
 @app.post("/measurements/log")
 def log_measurement(data: BodyMeasurement):
+    if not any([data.body_weight, data.waist, data.hips, data.chest]):
+        return {"ok": False, "error": "all fields empty"}
     today = date.today().isoformat()
     with get_db() as conn:
         existing = fetchone(conn,
@@ -575,7 +577,6 @@ def get_progress(tg_id: int):
 
         streak = 0
         today = date.today()
-        from datetime import timedelta
         for i, w in enumerate(workouts):
             expected = (today - timedelta(days=i)).isoformat()
             if w["date"] == expected:
