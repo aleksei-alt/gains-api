@@ -263,6 +263,7 @@ class UserSetup(BaseModel):
     body_weight: Optional[float] = None
     height: Optional[float] = None
     age: Optional[int] = None
+    notify_hour: Optional[int] = 10
 
 class ExerciseLog(BaseModel):
     tg_id: int
@@ -302,14 +303,15 @@ def serve_app():
 def setup_user(data: UserSetup):
     with get_db() as conn:
         existing = fetchone(conn, "SELECT tg_id FROM users WHERE tg_id=?", (data.tg_id,))
+        notify_hour = data.notify_hour if data.notify_hour is not None else 10
         if existing:
             db_execute(conn,
-                "UPDATE users SET location=?, goal=?, level=?, days_per_week=?, body_weight=?, height=?, age=? WHERE tg_id=?",
-                (data.location, data.goal, data.level, data.days_per_week, data.body_weight, data.height, data.age, data.tg_id))
+                "UPDATE users SET location=?, goal=?, level=?, days_per_week=?, body_weight=?, height=?, age=?, notify_hour=? WHERE tg_id=?",
+                (data.location, data.goal, data.level, data.days_per_week, data.body_weight, data.height, data.age, notify_hour, data.tg_id))
         else:
             db_execute(conn,
-                "INSERT INTO users (tg_id, location, goal, level, days_per_week, body_weight, height, age, trial_start) VALUES (?,?,?,?,?,?,?,?,?)",
-                (data.tg_id, data.location, data.goal, data.level, data.days_per_week, data.body_weight, data.height, data.age, date.today().isoformat()))
+                "INSERT INTO users (tg_id, location, goal, level, days_per_week, body_weight, height, age, notify_hour, trial_start) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                (data.tg_id, data.location, data.goal, data.level, data.days_per_week, data.body_weight, data.height, data.age, notify_hour, date.today().isoformat()))
     return {"ok": True}
 
 

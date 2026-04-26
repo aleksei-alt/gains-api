@@ -200,6 +200,43 @@
     }
     .day-btn.selected .day-num { color: var(--accent); }
 
+    /* NOTIFY TIME GRID */
+    .time-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .time-btn {
+      background: var(--card);
+      border: 1.5px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 8px;
+      cursor: pointer;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 22px;
+      letter-spacing: 1px;
+      color: var(--text);
+      transition: all 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+      text-align: center;
+    }
+    .time-btn .time-ampm {
+      display: block;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 10px;
+      color: var(--text-3);
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-top: 2px;
+    }
+    .time-btn:active { transform: scale(0.96); }
+    .time-btn.selected {
+      border-color: var(--accent);
+      background: linear-gradient(135deg, rgba(198,255,0,0.08), rgba(198,255,0,0.02));
+      color: var(--accent);
+    }
+
     /* BOTTOM BUTTONS */
     .bottom-area { padding: 20px 0 0; }
     .btn-primary {
@@ -726,7 +763,7 @@
 
 <!-- ONBOARDING -->
 <div id="onboarding" class="screen active">
-  <div style="position:absolute;top:6px;right:10px;font-size:10px;opacity:0.25;color:white;z-index:99">v15</div>
+  <div style="position:absolute;top:6px;right:10px;font-size:10px;opacity:0.25;color:white;z-index:99">v16</div>
   <div>
     <div class="onboard-header">
       <div class="logo">GAINS</div>
@@ -739,6 +776,7 @@
       <div class="step-dot" id="dot-2"></div>
       <div class="step-dot" id="dot-3"></div>
       <div class="step-dot" id="dot-4"></div>
+      <div class="step-dot" id="dot-5"></div>
     </div>
 
     <!-- Step 1: Location -->
@@ -875,6 +913,26 @@
     </div>
   </div>
 
+    <!-- Step 6: Notify time -->
+    <div class="onboard-step" id="step-notify">
+      <div class="step-title">Когда напоминать?</div>
+      <div class="step-subtitle">Московское время (МСК) — придёт напоминание о тренировке</div>
+      <div class="time-grid">
+        <button class="time-btn" data-val="7" onclick="selectTime(this)">07:00<span class="time-ampm">Утро</span></button>
+        <button class="time-btn" data-val="8" onclick="selectTime(this)">08:00<span class="time-ampm">Утро</span></button>
+        <button class="time-btn" data-val="9" onclick="selectTime(this)">09:00<span class="time-ampm">Утро</span></button>
+        <button class="time-btn" data-val="10" onclick="selectTime(this)">10:00<span class="time-ampm">Утро</span></button>
+        <button class="time-btn" data-val="11" onclick="selectTime(this)">11:00<span class="time-ampm">День</span></button>
+        <button class="time-btn" data-val="12" onclick="selectTime(this)">12:00<span class="time-ampm">День</span></button>
+        <button class="time-btn" data-val="17" onclick="selectTime(this)">17:00<span class="time-ampm">Вечер</span></button>
+        <button class="time-btn" data-val="18" onclick="selectTime(this)">18:00<span class="time-ampm">Вечер</span></button>
+        <button class="time-btn" data-val="19" onclick="selectTime(this)">19:00<span class="time-ampm">Вечер</span></button>
+        <button class="time-btn" data-val="20" onclick="selectTime(this)">20:00<span class="time-ampm">Вечер</span></button>
+        <button class="time-btn" data-val="21" onclick="selectTime(this)">21:00<span class="time-ampm">Ночь</span></button>
+      </div>
+    </div>
+  </div>
+
   <div class="bottom-area">
     <button class="btn-primary" id="onboard-next-btn" onclick="onboardNext()" disabled>Далее</button>
   </div>
@@ -962,13 +1020,14 @@ let state = {
   body_weight: null,
   height: null,
   age: null,
+  notify_hour: 10,
   currentStep: 'location',
   workout: null,
   splitDay: '',
   loggedExercises: new Set()
 };
 
-const steps = ['location', 'goal', 'level', 'days', 'body'];
+const steps = ['location', 'goal', 'level', 'days', 'body', 'notify'];
 
 // --- ONBOARDING ---
 function selectOption(el, type) {
@@ -992,6 +1051,13 @@ function selectDay(el) {
   document.getElementById('onboard-next-btn').disabled = false;
 }
 
+function selectTime(el) {
+  document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  state.notify_hour = parseInt(el.dataset.val);
+  document.getElementById('onboard-next-btn').disabled = false;
+}
+
 function onboardNext() {
   const currentIdx = steps.indexOf(state.currentStep);
 
@@ -1001,8 +1067,9 @@ function onboardNext() {
     document.getElementById(`step-${state.currentStep}`).classList.add('active');
     document.getElementById('onboard-next-btn').disabled = true;
     document.getElementById('onboard-next-btn').textContent =
-      state.currentStep === 'body' ? 'Начать' : 'Далее';
+      state.currentStep === 'notify' ? 'Начать' : 'Далее';
     if (state.currentStep === 'body') document.getElementById('onboard-next-btn').disabled = true;
+    if (state.currentStep === 'notify') document.getElementById('onboard-next-btn').disabled = true;
     const newIdx = steps.indexOf(state.currentStep);
     document.querySelectorAll('.step-dot').forEach((d, i) => d.classList.toggle('active', i === newIdx));
   } else {
@@ -1029,7 +1096,8 @@ async function finishOnboarding() {
       days_per_week: state.days,
       body_weight: parseFloat(document.getElementById('input-weight')?.value) || null,
       height: parseFloat(document.getElementById('input-height')?.value) || null,
-      age: parseInt(document.getElementById('input-age')?.value) || null
+      age: parseInt(document.getElementById('input-age')?.value) || null,
+      notify_hour: state.notify_hour
     }),
     signal: ctrl.signal
   }).catch(() => {});
