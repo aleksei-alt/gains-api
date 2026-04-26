@@ -115,9 +115,14 @@ def init_db():
                     tg_id BIGINT,
                     date TEXT,
                     exercises TEXT,
-                    completed INTEGER DEFAULT 0
+                    completed INTEGER DEFAULT 0,
+                    split_day TEXT DEFAULT 'Тренировка'
                 )
             """)
+            try:
+                cur.execute("ALTER TABLE workouts ADD COLUMN IF NOT EXISTS split_day TEXT DEFAULT 'Тренировка'")
+            except Exception:
+                pass
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS exercise_logs (
                     id SERIAL PRIMARY KEY,
@@ -151,7 +156,8 @@ def init_db():
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP, trial_start TEXT, is_premium INTEGER DEFAULT 0)""")
             conn.execute("""CREATE TABLE IF NOT EXISTS workouts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, tg_id INTEGER, date TEXT,
-                exercises TEXT, completed INTEGER DEFAULT 0)""")
+                exercises TEXT, completed INTEGER DEFAULT 0,
+                split_day TEXT DEFAULT 'Тренировка')""")
             conn.execute("""CREATE TABLE IF NOT EXISTS exercise_logs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, tg_id INTEGER, workout_id INTEGER,
                 exercise TEXT, sets INTEGER, reps INTEGER, weight REAL,
@@ -166,6 +172,10 @@ def init_db():
                     conn.execute(f"ALTER TABLE users ADD COLUMN {col} {typ}")
                 except Exception:
                     pass
+            try:
+                conn.execute("ALTER TABLE workouts ADD COLUMN split_day TEXT DEFAULT 'Тренировка'")
+            except Exception:
+                pass
 
 init_db()
 
@@ -327,7 +337,9 @@ def get_today_workout(tg_id: int):
             completed_count = fetchone(conn,
                 "SELECT COUNT(*) as cnt FROM workouts WHERE tg_id=? AND completed=1", (tg_id,))["cnt"]
             next_split = get_split_day(user["days_per_week"], completed_count)
-            return {"workout": workout, "logs": logs, "next_split_day": next_split}
+            return {"workout": workout, "logs": logs,
+                    "split_day": workout.get("split_day") or "Тренировка",
+                    "next_split_day": next_split}
 
         total_workouts = fetchone(conn,
             "SELECT COUNT(*) as cnt FROM workouts WHERE tg_id=? AND completed=1", (tg_id,))["cnt"]
@@ -340,8 +352,8 @@ def get_today_workout(tg_id: int):
         split_day = get_split_day(user["days_per_week"], total_workouts)
         workout_plan = generate_workout(user, history, split_day)
 
-        db_execute(conn, "INSERT INTO workouts (tg_id, date, exercises) VALUES (?,?,?)",
-            (tg_id, today, workout_plan))
+        db_execute(conn, "INSERT INTO workouts (tg_id, date, exercises, split_day) VALUES (?,?,?,?)",
+            (tg_id, today, workout_plan, split_day))
 
         if USE_POSTGRES:
             new_workout = fetchone(conn, "SELECT * FROM workouts WHERE tg_id=? AND date=? ORDER BY id DESC LIMIT 1", (tg_id, today))
@@ -537,6 +549,22 @@ def activate_premium(tg_id: int):
     return {"ok": True}
 
 
+@app.post("/subscription/{tg_id}/invoice")
+async def create_invoice(tg_id: int):
+    async with httpx.AsyncClient() as client:
+        r = await client.post(f"{TG_API}/createInvoiceLink", json={
+            "title": "GAINS Premium",
+            "description": "AI план · Прогрессия весов · История тренировок · Стрик",
+            "payload": f"premium_{tg_id}",
+            "currency": "XTR",
+            "prices": [{"label": "Подписка на месяц", "amount": PRICE_STARS}]
+        }, timeout=10)
+        data = r.json()
+        if data.get("ok"):
+            return {"url": data["result"]}
+        raise HTTPException(500, f"Invoice error: {data}")
+
+
 @app.post("/users/{tg_id}/notify")
 def set_notify(tg_id: int, hour: int):
     if hour < 0 or hour > 23:
@@ -582,7 +610,7 @@ async def tg_answer_cb(cb_id: str, text: str = ""):
 
 
 PRICE_RUB = 290
-PRICE_STARS = 150
+PRICE_STARS = 219
 
 START_TEXT = (
     "Твой тренировочный трекер.\n\n"
@@ -630,11 +658,29 @@ async def telegram_webhook(request: Request):
     data = await request.json()
     msg = data.get("message", {})
     cb = data.get("callback_query", {})
+    pre_checkout = data.get("pre_checkout_query", {})
+
+    if pre_checkout:
+        async with httpx.AsyncClient() as client:
+            await client.post(f"{TG_API}/answerPreCheckoutQuery",
+                json={"pre_checkout_query_id": pre_checkout["id"], "ok": True}, timeout=10)
+        return {"ok": True}
 
     if msg:
         chat_id = msg.get("chat", {}).get("id")
         text = msg.get("text", "")
         first_name = msg.get("from", {}).get("first_name", "Атлет")
+
+        if msg.get("successful_payment"):
+            tg_id = msg["from"]["id"]
+            payload = msg["successful_payment"].get("invoice_payload", "")
+            if payload.startswith("premium_"):
+                with get_db() as conn:
+                    db_execute(conn, "UPDATE users SET is_premium=1 WHERE tg_id=?", (tg_id,))
+                await tg_send(chat_id,
+                    "✅ <b>GAINS Premium активирован!</b>\n\nТренируйся без ограничений 💪",
+                    {"inline_keyboard": [[{"text": "Открыть GAINS 💪", "web_app": {"url": TMA_URL}}]]})
+            return {"ok": True}
 
         if text.startswith("/start"):
             keyboard = {"inline_keyboard": [
