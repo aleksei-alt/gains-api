@@ -881,29 +881,19 @@ async def telegram_webhook(request: Request):
 @app.get("/admin/stats")
 def admin_stats():
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
+    yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
     with get_db() as conn:
-        if USE_POSTGRES:
-            total_users = fetchone(conn, "SELECT COUNT(*) as c FROM users")["c"]
-            premium_users = fetchone(conn, "SELECT COUNT(*) as c FROM users WHERE is_premium=true")["c"]
-            trial_users = fetchone(conn, "SELECT COUNT(*) as c FROM users WHERE trial_start IS NOT NULL AND is_premium=false")["c"]
-            active_today = fetchone(conn, "SELECT COUNT(DISTINCT tg_id) as c FROM workouts WHERE date=%s", (today,))["c"]
-            workouts_today = fetchone(conn, "SELECT COUNT(*) as c FROM workouts WHERE date=%s", (today,))["c"]
-            total_workouts = fetchone(conn, "SELECT COUNT(*) as c FROM workouts")["c"]
-            total_logs = fetchone(conn, "SELECT COUNT(*) as c FROM exercise_logs")["c"]
-            total_measurements = fetchone(conn, "SELECT COUNT(*) as c FROM body_measurements")["c"]
-            new_week = fetchone(conn, "SELECT COUNT(*) as c FROM users WHERE created_at >= NOW() - INTERVAL '7 days'")["c"]
-            new_today = fetchone(conn, "SELECT COUNT(*) as c FROM users WHERE created_at >= NOW() - INTERVAL '1 day'")["c"]
-        else:
-            total_users = fetchone(conn, "SELECT COUNT(*) as c FROM users")["c"]
-            premium_users = fetchone(conn, "SELECT COUNT(*) as c FROM users WHERE is_premium=1")["c"]
-            trial_users = fetchone(conn, "SELECT COUNT(*) as c FROM users WHERE trial_start IS NOT NULL AND is_premium=0")["c"]
-            active_today = fetchone(conn, "SELECT COUNT(DISTINCT tg_id) as c FROM workouts WHERE date=?", (today,))["c"]
-            workouts_today = fetchone(conn, "SELECT COUNT(*) as c FROM workouts WHERE date=?", (today,))["c"]
-            total_workouts = fetchone(conn, "SELECT COUNT(*) as c FROM workouts")["c"]
-            total_logs = fetchone(conn, "SELECT COUNT(*) as c FROM exercise_logs")["c"]
-            total_measurements = fetchone(conn, "SELECT COUNT(*) as c FROM body_measurements")["c"]
-            new_week = fetchone(conn, "SELECT COUNT(*) as c FROM users WHERE created_at >= date('now','-7 days')")["c"]
-            new_today = fetchone(conn, "SELECT COUNT(*) as c FROM users WHERE created_at >= date('now','-1 day')")["c"]
+        total_users = fetchone(conn, "SELECT COUNT(*) as c FROM users")["c"]
+        premium_users = fetchone(conn, "SELECT COUNT(*) as c FROM users WHERE is_premium=1")["c"]
+        trial_users = fetchone(conn, "SELECT COUNT(*) as c FROM users WHERE trial_start IS NOT NULL AND is_premium=0")["c"]
+        active_today = fetchone(conn, "SELECT COUNT(DISTINCT tg_id) as c FROM workouts WHERE date=?", (today,))["c"]
+        workouts_today = fetchone(conn, "SELECT COUNT(*) as c FROM workouts WHERE date=?", (today,))["c"]
+        total_workouts = fetchone(conn, "SELECT COUNT(*) as c FROM workouts")["c"]
+        total_logs = fetchone(conn, "SELECT COUNT(*) as c FROM exercise_logs")["c"]
+        total_measurements = fetchone(conn, "SELECT COUNT(*) as c FROM body_measurements")["c"]
+        new_week = fetchone(conn, "SELECT COUNT(*) as c FROM users WHERE created_at::date >= ?::date", (week_ago,))["c"] if USE_POSTGRES else fetchone(conn, "SELECT COUNT(*) as c FROM users WHERE date(created_at) >= ?", (week_ago,))["c"]
+        new_today = fetchone(conn, "SELECT COUNT(*) as c FROM users WHERE created_at::date >= ?::date", (yesterday,))["c"] if USE_POSTGRES else fetchone(conn, "SELECT COUNT(*) as c FROM users WHERE date(created_at) >= ?", (yesterday,))["c"]
     return {
         "total_users": total_users,
         "premium_users": premium_users,
