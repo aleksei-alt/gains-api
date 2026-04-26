@@ -726,7 +726,7 @@
 
 <!-- ONBOARDING -->
 <div id="onboarding" class="screen active">
-  <div style="position:absolute;top:6px;right:10px;font-size:10px;opacity:0.25;color:white;z-index:99">v12</div>
+  <div style="position:absolute;top:6px;right:10px;font-size:10px;opacity:0.25;color:white;z-index:99">v13</div>
   <div>
     <div class="onboard-header">
       <div class="logo">GAINS</div>
@@ -1352,7 +1352,7 @@ async function loadProfile() {
   const user = await userR.json();
   const sub = await subR.json();
 
-  const goalMap = {mass:'Набор массы', strength:'Сила', cut:'Рельеф'};
+  const goalMap = {mass:'Набор массы', strength:'Сила', cut:'Рельеф', weight_loss:'Сбросить вес'};
   const levelMap = {beginner:'Новичок', intermediate:'Средний', advanced:'Продвинутый'};
 
   const name = tg.initDataUnsafe?.user?.first_name || 'Атлет';
@@ -1361,10 +1361,11 @@ async function loadProfile() {
   let subHtml = '';
   if (sub.status === 'trial') {
     const wLeft = sub.workouts_left;
+    const wForm = wLeft === 1 ? 'тренировка' : (wLeft >= 2 && wLeft <= 4) ? 'тренировки' : 'тренировок';
     subHtml = `
     <div class="subscription-card">
       <div class="sub-status">БЕСПЛАТНЫЙ ДОСТУП</div>
-      <div class="sub-title">Осталось ${wLeft} ${wLeft === 1 ? 'тренировка' : wLeft < 5 ? 'тренировки' : 'тренировок'} бесплатно</div>
+      <div class="sub-title">Осталось ${wLeft} ${wForm} бесплатно</div>
       <div class="sub-desc">Попробуй — потом 290₽/мес если понравится</div>
       <button class="stars-btn" onclick="payStars()">⭐ Подписаться — 290₽</button>
     </div>`;
@@ -1425,14 +1426,22 @@ async function changeNotifyTime(current) {
   } catch(e) {}
 }
 
-function payStars() {
-  tg.openInvoice('gains_monthly', (status) => {
-    if (status === 'paid') {
-      fetch(`${API}/subscription/${TG_ID}/activate`, { method: 'POST' });
-      showToast('Подписка активирована! 🎉', 'success');
-      loadProfile();
-    }
-  });
+async function payStars() {
+  try {
+    const r = await fetchWithTimeout(`${API}/subscription/${TG_ID}/invoice`, { method: 'POST' });
+    const { url } = await r.json();
+    tg.openInvoice(url, async (status) => {
+      if (status === 'paid') {
+        await fetchWithTimeout(`${API}/subscription/${TG_ID}/activate`, { method: 'POST' }).catch(() => {});
+        showToast('Подписка активирована! 🎉', 'success');
+        loadProfile();
+        const overlay = document.getElementById('paywall-overlay');
+        if (overlay) overlay.remove();
+      }
+    });
+  } catch(e) {
+    showToast('Ошибка соединения. Попробуй ещё раз.', '');
+  }
 }
 
 // --- REST TIMER ---
@@ -1556,7 +1565,7 @@ function showPaywall() {
         <div class="paywall-perk"><span>✓</span>Таймер отдыха с вибрацией</div>
       </div>
       <div class="paywall-price">290₽/мес</div>
-      <div class="paywall-period">≈ 200 ⭐ Telegram Stars · отмена в любой момент</div>
+      <div class="paywall-period">150 ⭐ Telegram Stars · отмена в любой момент</div>
       <button class="stars-btn" onclick="payStars()" style="margin-bottom:12px">⭐ Оформить подписку</button>
       <div style="font-size:13px;color:var(--text-3);cursor:pointer;margin-top:8px" onclick="document.getElementById('paywall-overlay').remove()">
         Позже
