@@ -669,7 +669,7 @@ async def create_invoice(tg_id: int):
     async with httpx.AsyncClient() as client:
         r = await client.post(f"{TG_API}/createInvoiceLink", json={
             "title": "GAINS Premium",
-            "description": "AI план · Прогрессия весов · История тренировок · Стрик",
+            "description": "Персональный план · Прогрессия весов · История тренировок · Стрик",
             "payload": f"premium_{tg_id}",
             "currency": "XTR",
             "prices": [{"label": "Подписка на месяц", "amount": PRICE_STARS}]
