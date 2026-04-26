@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+gains.db
+*.env
+.env
