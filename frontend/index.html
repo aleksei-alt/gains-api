@@ -333,18 +333,34 @@
       <div class="tagline">Твой тренировочный партнёр</div>
     </div>
 
-    <!-- Step 1: Goal -->
-    <div class="onboard-step active" id="step-goal">
+    <!-- Step 1: Location -->
+    <div class="onboard-step active" id="step-location">
+      <div class="step-title">Где тренируешься?</div>
+      <div class="step-subtitle">Подберём упражнения под твои условия</div>
+      <div class="options">
+        <div class="option-btn" data-val="gym" onclick="selectOption(this,'location')">
+          <div class="opt-title">В зале</div>
+          <div class="opt-desc">Штанга, гантели, тренажёры</div>
+        </div>
+        <div class="option-btn" data-val="home" onclick="selectOption(this,'location')">
+          <div class="opt-title">Дома</div>
+          <div class="opt-desc">Упражнения с весом тела</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: Goal -->
+    <div class="onboard-step" id="step-goal">
       <div class="step-title">Твоя цель</div>
       <div class="step-subtitle">Выберём программу под тебя</div>
       <div class="options">
         <div class="option-btn" data-val="mass" onclick="selectOption(this,'goal')">
           <div class="opt-title">Набор массы</div>
-          <div class="opt-desc">Больше объёма, прогрессия весов</div>
+          <div class="opt-desc">Больше объёма, прогрессия нагрузки</div>
         </div>
         <div class="option-btn" data-val="strength" onclick="selectOption(this,'goal')">
           <div class="opt-title">Сила</div>
-          <div class="opt-desc">Жим, присед, тяга — максимальные веса</div>
+          <div class="opt-desc">Базовые упражнения с максимальным весом</div>
         </div>
         <div class="option-btn" data-val="cut" onclick="selectOption(this,'goal')">
           <div class="opt-title">Рельеф</div>
@@ -353,7 +369,7 @@
       </div>
     </div>
 
-    <!-- Step 2: Level -->
+    <!-- Step 4: Level -->
     <div class="onboard-step" id="step-level">
       <div class="step-title">Твой уровень</div>
       <div class="step-subtitle">Как давно тренируешься</div>
@@ -373,10 +389,10 @@
       </div>
     </div>
 
-    <!-- Step 3: Days -->
+    <!-- Step 5: Days -->
     <div class="onboard-step" id="step-days">
-      <div class="step-title">Дней в неделю</div>
-      <div class="step-subtitle">Сколько раз ходишь в зал</div>
+      <div class="step-title">Как часто тренируешься?</div>
+      <div class="step-subtitle">Дней в неделю</div>
       <div class="days-selector">
         <button class="day-btn" data-val="3" onclick="selectDay(this)">3</button>
         <button class="day-btn" data-val="4" onclick="selectDay(this)">4</button>
@@ -445,7 +461,7 @@ const tg = window.Telegram.WebApp;
 tg.ready();
 tg.expand();
 
-const API = 'https://gains-api.railway.app'; // will be replaced after deploy
+const API = 'http://46.101.185.219:8766';
 const TG_ID = tg.initDataUnsafe?.user?.id || 999999; // fallback for testing
 
 let state = {
@@ -457,7 +473,7 @@ let state = {
   loggedExercises: new Set()
 };
 
-const steps = ['goal', 'level', 'days'];
+const steps = ['location', 'goal', 'level', 'days'];
 
 // --- ONBOARDING ---
 function selectOption(el, type) {
@@ -499,6 +515,7 @@ async function finishOnboarding() {
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({
       tg_id: TG_ID,
+      location: state.location,
       goal: state.goal,
       level: state.level,
       days_per_week: state.days
