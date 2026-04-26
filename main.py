@@ -361,7 +361,21 @@ def get_today_workout(tg_id: int):
         return _generate_and_return_workout(tg_id, today, user, conn)
 
 
+def _check_sub(tg_id: int, conn) -> str:
+    user = fetchone(conn, "SELECT is_premium FROM users WHERE tg_id=?", (tg_id,))
+    if user and user["is_premium"]:
+        return "premium"
+    completed = fetchone(conn,
+        "SELECT COUNT(*) as cnt FROM workouts WHERE tg_id=? AND completed=1", (tg_id,))["cnt"]
+    return "trial" if completed < 3 else "expired"
+
+
 def _generate_and_return_workout(tg_id: int, today: str, user: dict, conn):
+    # Block if trial expired and not premium
+    sub = _check_sub(tg_id, conn)
+    if sub == "expired":
+        return {"workout": None, "blocked": True}
+
     total_workouts = fetchone(conn,
         "SELECT COUNT(*) as cnt FROM workouts WHERE tg_id=? AND completed=1", (tg_id,))["cnt"]
     history = fetchall(conn,
@@ -385,6 +399,9 @@ def new_workout_today(tg_id: int):
         user = fetchone(conn, "SELECT * FROM users WHERE tg_id=?", (tg_id,))
         if not user:
             raise HTTPException(404, "User not found")
+        sub = _check_sub(tg_id, conn)
+        if sub == "expired":
+            return {"workout": None, "blocked": True}
         return _generate_and_return_workout(tg_id, today, user, conn)
 
 

@@ -831,7 +831,7 @@
 
 <!-- ONBOARDING -->
 <div id="onboarding" class="screen active">
-  <div style="position:absolute;top:6px;right:10px;font-size:10px;opacity:0.25;color:white;z-index:99">v20</div>
+  <div style="position:absolute;top:6px;right:10px;font-size:10px;opacity:0.25;color:white;z-index:99">v21</div>
   <div>
     <div class="onboard-header">
       <div class="logo">GAINS</div>
@@ -1263,6 +1263,19 @@ async function loadToday() {
 }
 
 function renderWorkout(data) {
+  // Subscription blocked
+  if (data.blocked) {
+    document.getElementById('workout-content').innerHTML = `
+      <div class="rest-day">
+        <div class="icon">⭐</div>
+        <h2>3 тренировки пройдено</h2>
+        <p>Бесплатный период закончился.<br>Оформи подписку чтобы продолжить прогресс.</p>
+        <button onclick="showPaywall()" style="margin-top:20px;width:100%;background:linear-gradient(135deg,#c6ff00,#8ab300);border:none;border-radius:16px;padding:16px;color:#000;font-size:16px;font-weight:900;cursor:pointer;font-family:'DM Sans',sans-serif">⭐ Оформить подписку</button>
+      </div>`;
+    showPaywall();
+    return;
+  }
+
   // Rest day screen
   if (data.is_rest_day) {
     const done = data.workouts_this_week || 0;
@@ -1755,6 +1768,7 @@ async function forceNewWorkout() {
   try {
     const r = await fetchWithTimeout(`${API}/workout/today/${TG_ID}/new`, {method:'POST'}, 20000);
     const data = await r.json();
+    if (data.blocked) { renderWorkout(data); return; }
     state.workout = data.workout;
     state.splitDay = data.split_day || '';
     renderWorkout(data);
