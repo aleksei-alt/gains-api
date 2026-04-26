@@ -709,30 +709,51 @@
       text-transform: uppercase; margin-bottom: 8px;
     }
 
-    /* REST TIMER */
+    /* REST TIMER — circular */
     .rest-timer {
       background: linear-gradient(135deg, #0c1800, #162500);
       border-radius: 20px;
-      padding: 20px 24px;
+      padding: 16px 20px;
       margin-top: 14px;
       display: none;
       align-items: center;
-      gap: 16px;
+      gap: 18px;
       border: 1px solid rgba(198,255,0,0.2);
       box-shadow: 0 4px 24px rgba(198,255,0,0.06);
     }
     .rest-timer.active { display: flex; }
+    .timer-circle-wrap {
+      position: relative;
+      width: 72px;
+      height: 72px;
+      flex-shrink: 0;
+    }
+    .timer-svg { width: 72px; height: 72px; transform: rotate(-90deg); }
+    .timer-track { fill: none; stroke: rgba(198,255,0,0.1); stroke-width: 5; }
+    .timer-progress {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 5;
+      stroke-linecap: round;
+      stroke-dasharray: 213.6;
+      stroke-dashoffset: 0;
+      transition: stroke-dashoffset 1s linear;
+      filter: drop-shadow(0 0 4px rgba(198,255,0,0.5));
+    }
     .timer-count {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       font-family: 'Bebas Neue', sans-serif;
-      font-size: 52px;
-      font-weight: 400;
+      font-size: 20px;
       color: var(--accent);
-      min-width: 80px;
-      font-variant-numeric: tabular-nums;
-      letter-spacing: 2px;
+      letter-spacing: 1px;
       line-height: 1;
     }
-    .timer-label { font-size: 11px; color: var(--accent); opacity: 0.6; flex: 1; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+    .timer-info { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+    .timer-label { font-size: 12px; color: var(--accent); opacity: 0.7; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase; }
     .timer-skip {
       background: rgba(198,255,0,0.1);
       border: 1px solid rgba(198,255,0,0.2);
@@ -744,6 +765,7 @@
       font-weight: 700;
       font-family: 'DM Sans', sans-serif;
       transition: all 0.15s;
+      align-self: flex-start;
     }
     .timer-skip:active { background: rgba(198,255,0,0.2); }
 
@@ -831,8 +853,7 @@
 
 <!-- ONBOARDING -->
 <div id="onboarding" class="screen active">
-  <div style="position:absolute;top:6px;right:10px;font-size:10px;opacity:0.25;color:white;z-index:99">v21</div>
-  <div>
+    <div>
     <div class="onboard-header">
       <div class="logo">GAINS</div>
       <div class="tagline">Твой тренировочный партнёр</div>
@@ -1012,7 +1033,7 @@
   <div id="tab-today" class="main-screen">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
       <div class="screen-title" style="margin-bottom:0">Сегодня</div>
-      <div id="streak-badge" style="display:none;background:linear-gradient(135deg,#ff6b35,#f7931e);color:#fff;border-radius:20px;padding:4px 12px;font-size:13px;font-weight:700">🔥 0</div>
+      <div id="streak-badge" style="display:none;background:linear-gradient(135deg,#c6ff00,#8ab300);color:#000;border-radius:20px;padding:4px 14px;font-size:13px;font-weight:900;letter-spacing:0.3px">🔥 0</div>
     </div>
     <div class="screen-subtitle" id="today-date"></div>
     <div id="workout-content"></div>
@@ -1365,12 +1386,20 @@ function renderWorkout(data) {
       </div>
       ${ex.tip ? `<div><span class="ex-tip-toggle" onclick="toggleTip(${i})">ℹ️ Техника</span><div class="ex-tip-text" id="tip-${i}" style="display:none">${ex.tip}</div></div>` : ''}
       <button class="log-btn ${isLogged ? 'logged' : ''}" onclick="logExercise(${i}, '${ex.exercise}', ${ex.rest_seconds || 90})" ${isLogged ? 'disabled' : ''}>
-        ${isLogged ? '✓ Записано' : 'Записать'}
+        ${isLogged ? '✓ Записано' : '📌 Записать подход'}
       </button>
       <div class="rest-timer" id="timer-${i}">
-        <div class="timer-count">90s</div>
-        <div class="timer-label">Отдых между подходами</div>
-        <button class="timer-skip" onclick="skipTimer(${i})">Пропустить</button>
+        <div class="timer-circle-wrap">
+          <svg class="timer-svg" viewBox="0 0 80 80">
+            <circle class="timer-track" cx="40" cy="40" r="34"/>
+            <circle class="timer-progress" cx="40" cy="40" r="34" id="timer-prog-${i}"/>
+          </svg>
+          <div class="timer-count" id="timer-count-${i}">${ex.rest_seconds || 90}s</div>
+        </div>
+        <div class="timer-info">
+          <div class="timer-label">Отдых</div>
+          <button class="timer-skip" onclick="skipTimer(${i})">Пропустить →</button>
+        </div>
       </div>
     </div>`;
   });
@@ -1389,9 +1418,9 @@ function renderWorkout(data) {
 }
 
 async function logExercise(idx, name, restSeconds = 90) {
-  const sets = parseInt(document.getElementById(`sets-${idx}`).value);
-  const reps = parseInt(document.getElementById(`reps-${idx}`).value);
-  const weight = parseFloat(document.getElementById(`weight-${idx}`).value);
+  const sets = parseInt(document.getElementById(`sets-${idx}`).value) || 1;
+  const reps = parseInt(document.getElementById(`reps-${idx}`).value) || 1;
+  const weight = parseFloat(document.getElementById(`weight-${idx}`).value) || 0;
 
   await fetchWithTimeout(`${API}/workout/log`, {
     method: 'POST',
@@ -1633,15 +1662,39 @@ function formatHour(h) {
 
 async function changeNotifyTime(current) {
   const hours = [7,8,9,10,11,12,17,18,19,20,21];
-  const opts = hours.map(h => formatHour(h));
-  const selected = prompt(`Когда присылать напоминание?\nТекущее: ${formatHour(current)}\nВведи час (7-21):`, current);
-  const h = parseInt(selected);
-  if (isNaN(h) || h < 0 || h > 23) return;
+  if (document.getElementById('notify-picker')) return;
+  const el = document.createElement('div');
+  el.id = 'notify-picker';
+  el.className = 'edit-modal-overlay';
+  el.innerHTML = `
+    <div class="edit-modal">
+      <div class="edit-modal-title">Время уведомлений</div>
+      <div class="edit-section-label">Московское время (МСК)</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:20px">
+        ${hours.map(h => `<div class="edit-chip ${h===current?'active':''}" onclick="pickNotifyHour(${h},this)">${formatHour(h)}</div>`).join('')}
+      </div>
+      <button class="btn-primary" onclick="saveNotifyHour()">Сохранить</button>
+      <button onclick="document.getElementById('notify-picker').remove()" style="width:100%;background:transparent;border:none;padding:12px;color:var(--text-3);font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif">Отмена</button>
+    </div>`;
+  document.body.appendChild(el);
+  window._notifyHour = current;
+}
+
+function pickNotifyHour(h, el) {
+  document.querySelectorAll('#notify-picker .edit-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  window._notifyHour = h;
+}
+
+async function saveNotifyHour() {
+  const h = window._notifyHour;
+  if (!h) return;
   try {
     await fetchWithTimeout(`${API}/users/${TG_ID}/notify?hour=${h}`, { method: 'POST' });
-    showToast(`Уведомление в ${formatHour(h)} ✓`, 'success');
+    document.getElementById('notify-picker')?.remove();
+    showToast(`Уведомления в ${formatHour(h)} МСК ✓`, 'success');
     loadProfile();
-  } catch(e) {}
+  } catch(e) { showToast('Ошибка', ''); }
 }
 
 async function payStars() {
@@ -1665,8 +1718,9 @@ async function payStars() {
 // --- REST TIMER ---
 let restInterval = null;
 let restActiveCardIdx = null;
+const TIMER_DASH = 213.6; // 2 * Math.PI * 34
+
 function startRestTimer(seconds, cardIdx) {
-  // hide previous timer
   if (restActiveCardIdx !== null && restActiveCardIdx !== cardIdx) {
     const prev = document.getElementById(`timer-${restActiveCardIdx}`);
     if (prev) prev.classList.remove('active');
@@ -1676,21 +1730,27 @@ function startRestTimer(seconds, cardIdx) {
   const timerEl = document.getElementById(`timer-${cardIdx}`);
   if (!timerEl) return;
   timerEl.classList.add('active');
+  const countEl = document.getElementById(`timer-count-${cardIdx}`) || timerEl.querySelector('.timer-count');
+  const progEl = document.getElementById(`timer-prog-${cardIdx}`);
   let left = seconds;
-  timerEl.querySelector('.timer-count').textContent = left + 's';
+  if (countEl) countEl.textContent = left + 's';
+  if (progEl) progEl.style.strokeDashoffset = 0;
   restInterval = setInterval(() => {
     left--;
-    timerEl.querySelector('.timer-count').textContent = left + 's';
+    if (!document.getElementById(`timer-${cardIdx}`)) { clearInterval(restInterval); restInterval = null; return; }
+    if (countEl) countEl.textContent = left + 's';
+    if (progEl) progEl.style.strokeDashoffset = TIMER_DASH * (1 - left / seconds);
     if (left <= 0) {
       clearInterval(restInterval);
       restInterval = null;
       restActiveCardIdx = null;
       timerEl.classList.remove('active');
       try { tg.HapticFeedback.notificationOccurred('success'); } catch(e) {}
-      showToast('Отдых окончен!');
+      showToast('Отдых окончен! Следующий подход 💪');
     }
   }, 1000);
 }
+
 function skipTimer(cardIdx) {
   if (restInterval) { clearInterval(restInterval); restInterval = null; }
   restActiveCardIdx = null;
@@ -1884,19 +1944,20 @@ function showPaywall() {
   el.innerHTML = `
     <div class="paywall-sheet">
       <div class="paywall-emoji">🏆</div>
-      <div class="paywall-title">3 тренировки пройдено!</div>
-      <div class="paywall-desc">Продолжи прогресс с полным доступом.<br>AI помнит каждый твой вес.</div>
+      <div class="paywall-title">Пробный период завершён</div>
+      <div class="paywall-desc">Ты уже знаешь как это работает.<br>Продолжи — AI не забудет ни одного кг.</div>
       <div class="paywall-perks">
-        <div class="paywall-perk"><span>✓</span>AI план на каждую тренировку</div>
-        <div class="paywall-perk"><span>✓</span>Прогрессия весов автоматически</div>
-        <div class="paywall-perk"><span>✓</span>История и замеры тела</div>
-        <div class="paywall-perk"><span>✓</span>Таймер отдыха с вибрацией</div>
+        <div class="paywall-perk"><span>✓</span>AI тренировка каждый день</div>
+        <div class="paywall-perk"><span>✓</span>Прогрессия весов — автоматически</div>
+        <div class="paywall-perk"><span>✓</span>История и анализ каждой тренировки</div>
+        <div class="paywall-perk"><span>✓</span>Коуч-фидбек после каждой сессии</div>
+        <div class="paywall-perk"><span>✓</span>Умные уведомления по расписанию</div>
       </div>
       <div class="paywall-price">290₽/мес</div>
-      <div class="paywall-period">219 ⭐ Telegram Stars · отмена в любой момент</div>
-      <button class="stars-btn" onclick="payStars()" style="margin-bottom:12px">⭐ Оформить — 219 Stars</button>
+      <div class="paywall-period">219 ⭐ Telegram Stars · отменить в любой момент</div>
+      <button class="stars-btn" onclick="payStars()" style="margin-bottom:12px">⭐ Оформить за 219 Stars</button>
       <div style="font-size:13px;color:var(--text-3);cursor:pointer;margin-top:8px" onclick="document.getElementById('paywall-overlay').remove()">
-        Позже
+        Не сейчас
       </div>
     </div>`;
   document.body.appendChild(el);
