@@ -29,6 +29,7 @@ def init_db():
             body_weight REAL,
             height REAL,
             age INTEGER,
+            notify_hour INTEGER DEFAULT 10,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             trial_start TEXT,
             is_premium INTEGER DEFAULT 0
@@ -63,7 +64,7 @@ def init_db():
         );
         """)
     # migrate existing db
-    for col, typ in [("body_weight", "REAL"), ("height", "REAL"), ("age", "INTEGER")]:
+    for col, typ in [("body_weight", "REAL"), ("height", "REAL"), ("age", "INTEGER"), ("notify_hour", "INTEGER")]:
         try:
             conn.execute(f"ALTER TABLE users ADD COLUMN {col} {typ}")
             conn.commit()
@@ -487,3 +488,43 @@ def activate_premium(tg_id: int):
     with db() as conn:
         conn.execute("UPDATE users SET is_premium=1 WHERE tg_id=?", (tg_id,))
     return {"ok": True}
+
+
+@app.post("/users/{tg_id}/notify")
+def set_notify(tg_id: int, hour: int):
+    if hour < 0 or hour > 23:
+        raise HTTPException(400, "Invalid hour")
+    with db() as conn:
+        conn.execute("UPDATE users SET notify_hour=? WHERE tg_id=?", (hour, tg_id))
+    return {"ok": True}
+
+
+@app.get("/notify/due")
+def get_notify_due(hour: int):
+    """Returns users to notify at this hour with their progress data."""
+    today = date.today().isoformat()
+    with db() as conn:
+        users = conn.execute(
+            "SELECT tg_id, days_per_week FROM users WHERE notify_hour=?", (hour,)
+        ).fetchall()
+        result = []
+        for u in users:
+            tg_id = u["tg_id"]
+            streak = conn.execute(
+                "SELECT COUNT(*) as cnt FROM workouts WHERE tg_id=? AND completed=1 AND date >= date('now', '-7 days')",
+                (tg_id,)
+            ).fetchone()["cnt"]
+            total = conn.execute(
+                "SELECT COUNT(*) as cnt FROM workouts WHERE tg_id=? AND completed=1", (tg_id,)
+            ).fetchone()["cnt"]
+            # Check if already trained today
+            trained_today = conn.execute(
+                "SELECT id FROM workouts WHERE tg_id=? AND date=? AND completed=1", (tg_id, today)
+            ).fetchone()
+            if not trained_today:
+                result.append({
+                    "tg_id": tg_id,
+                    "streak": streak,
+                    "total": total
+                })
+    return {"users": result}
