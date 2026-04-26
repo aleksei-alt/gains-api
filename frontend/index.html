@@ -831,7 +831,7 @@
 
 <!-- ONBOARDING -->
 <div id="onboarding" class="screen active">
-  <div style="position:absolute;top:6px;right:10px;font-size:10px;opacity:0.25;color:white;z-index:99">v19</div>
+  <div style="position:absolute;top:6px;right:10px;font-size:10px;opacity:0.25;color:white;z-index:99">v20</div>
   <div>
     <div class="onboard-header">
       <div class="logo">GAINS</div>
@@ -1424,7 +1424,24 @@ async function finishWorkout() {
   document.getElementById('finish-btn').textContent = '✅ Завершено';
   document.getElementById('finish-btn').disabled = true;
   loadStreak();
-  // check if trial expired
+
+  // AI coach feedback
+  const feedbackEl = document.createElement('div');
+  feedbackEl.id = 'coach-feedback';
+  feedbackEl.style.cssText = 'background:linear-gradient(135deg,#0c1800,#162500);border:1px solid rgba(198,255,0,0.2);border-radius:16px;padding:16px;margin-top:16px;font-size:14px;color:var(--text-2);line-height:1.6;';
+  feedbackEl.innerHTML = '<div style="font-size:11px;color:var(--accent);font-weight:700;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:8px">Тренер</div><div style="opacity:0.5">Анализирую тренировку...</div>';
+  const finBtn = document.getElementById('finish-btn');
+  if (finBtn) finBtn.after(feedbackEl);
+
+  fetchWithTimeout(`${API}/workout/${state.workout.id}/feedback`, {}, 15000)
+    .then(r => r.json())
+    .then(d => {
+      if (feedbackEl && d.feedback) {
+        feedbackEl.querySelector('div:last-child').textContent = d.feedback;
+        feedbackEl.querySelector('div:last-child').style.opacity = '1';
+      }
+    }).catch(() => { if (feedbackEl) feedbackEl.remove(); });
+
   setTimeout(async () => {
     try {
       const r = await fetchWithTimeout(`${API}/subscription/${TG_ID}`);
@@ -1480,6 +1497,21 @@ async function loadProgress() {
       });
     }
 
+    let balanceHtml = '';
+    const balance = data.muscle_balance || {};
+    if (Object.keys(balance).length) {
+      const items = Object.entries(balance).map(([name, cnt]) =>
+        `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
+          <span style="font-size:14px;font-weight:600">${name}</span>
+          <span style="color:var(--accent);font-weight:800;font-size:15px">${cnt}×</span>
+        </div>`).join('');
+      balanceHtml = `
+        <div style="background:var(--card);border-radius:16px;padding:16px;margin-bottom:20px;border:1px solid var(--border)">
+          <div style="font-size:11px;color:var(--text-3);font-weight:700;letter-spacing:0.8px;text-transform:uppercase;margin-bottom:8px">На этой неделе</div>
+          ${items}
+        </div>`;
+    }
+
     document.getElementById('progress-content').innerHTML = `
       <div class="stats-grid">
         <div class="stat-card">
@@ -1491,6 +1523,7 @@ async function loadProgress() {
           <div class="stat-label">Тренировок</div>
         </div>
       </div>
+      ${balanceHtml}
       ${sessionsHtml}
       ${bestHtml}`;
   } catch(e) {

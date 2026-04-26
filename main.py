@@ -507,6 +507,48 @@ def complete_workout(workout_id: int):
     return {"ok": True}
 
 
+@app.get("/workout/{workout_id}/feedback")
+def get_workout_feedback(workout_id: int):
+    with get_db() as conn:
+        workout = fetchone(conn, "SELECT * FROM workouts WHERE id=?", (workout_id,))
+        if not workout:
+            raise HTTPException(404)
+        tg_id = workout["tg_id"]
+        logs = fetchall(conn, "SELECT * FROM exercise_logs WHERE workout_id=?", (workout_id,))
+        if not logs:
+            return {"feedback": "Чисто отработал. Так и держи 💪"}
+        prev = fetchone(conn,
+            "SELECT id FROM workouts WHERE tg_id=? AND completed=1 AND id!=? ORDER BY id DESC",
+            (tg_id, workout_id))
+        prev_logs = fetchall(conn, "SELECT * FROM exercise_logs WHERE workout_id=?", (prev["id"],)) if prev else []
+        prev_map = {l["exercise"]: l for l in prev_logs}
+        improvements = []
+        for l in logs:
+            p = prev_map.get(l["exercise"])
+            if p:
+                if l["weight"] > p["weight"] and l["weight"] > 0:
+                    improvements.append(f"{l['exercise']}: {p['weight']}→{l['weight']}кг (+{round(l['weight']-p['weight'],1)}кг)")
+                elif l["reps"] > p["reps"]:
+                    improvements.append(f"{l['exercise']}: {p['reps']}→{l['reps']} повт.")
+        summary = ", ".join([
+            f"{l['exercise']} {l['sets']}×{l['reps']}" + (f"@{l['weight']}кг" if l["weight"] > 0 else "")
+            for l in logs[:4]])
+        imp_text = "Прогресс: " + "; ".join(improvements) if improvements else "Первая тренировка этого типа."
+        prompt = f"""Ты — жёсткий но справедливый тренер. 2 предложения о тренировке.
+
+Выполнено: {summary}
+{imp_text}
+
+Правила:
+- Предложение 1: конкретное наблюдение с числом или упражнением
+- Предложение 2: конкретная цель на следующий раз
+- Без воды, без "молодец просто так". Одно эмодзи в конце."""
+        client = anthropic.Anthropic(api_key=CLAUDE_KEY)
+        r = client.messages.create(model="claude-haiku-4-5-20251001", max_tokens=120,
+            messages=[{"role": "user", "content": prompt}])
+        return {"feedback": r.content[0].text.strip()}
+
+
 @app.get("/progress/{tg_id}")
 def get_progress(tg_id: int):
     with get_db() as conn:
@@ -552,8 +594,18 @@ def get_progress(tg_id: int):
             except Exception:
                 pass
 
+        monday = (date.today() - timedelta(days=date.today().weekday())).isoformat()
+        week_workouts = fetchall(conn,
+            "SELECT split_day FROM workouts WHERE tg_id=? AND completed=1 AND date >= ?",
+            (tg_id, monday))
+        muscle_balance = {}
+        for w in week_workouts:
+            sd = w.get("split_day") or "Тренировка"
+            muscle_balance[sd] = muscle_balance.get(sd, 0) + 1
+
         return {"streak": streak, "total_workouts": total,
-                "top_exercises": exercises, "sessions": sessions}
+                "top_exercises": exercises, "sessions": sessions,
+                "muscle_balance": muscle_balance}
 
 
 @app.get("/subscription/{tg_id}")
@@ -607,21 +659,31 @@ def set_notify(tg_id: int, hour: int):
 @app.get("/notify/due")
 def get_notify_due(hour: int):
     today = date.today().isoformat()
+    monday = (date.today() - timedelta(days=date.today().weekday())).isoformat()
     with get_db() as conn:
         users = fetchall(conn, "SELECT tg_id, days_per_week FROM users WHERE notify_hour=?", (hour,))
         result = []
         for u in users:
             tg_id = u["tg_id"]
-            streak = fetchone(conn,
-                "SELECT COUNT(*) as cnt FROM workouts WHERE tg_id=? AND completed=1 AND date >= %s" if USE_POSTGRES
-                else "SELECT COUNT(*) as cnt FROM workouts WHERE tg_id=? AND completed=1 AND date >= date('now', '-7 days')",
-                (tg_id, (date.today() - timedelta(days=7)).isoformat()) if USE_POSTGRES else (tg_id,))["cnt"]
-            total = fetchone(conn,
-                "SELECT COUNT(*) as cnt FROM workouts WHERE tg_id=? AND completed=1", (tg_id,))["cnt"]
             trained_today = fetchone(conn,
                 "SELECT id FROM workouts WHERE tg_id=? AND date=? AND completed=1", (tg_id, today))
-            if not trained_today:
-                result.append({"tg_id": tg_id, "streak": streak, "total": total})
+            if trained_today:
+                continue
+            streak = 0
+            for i in range(30):
+                d = (date.today() - timedelta(days=i)).isoformat()
+                w = fetchone(conn, "SELECT id FROM workouts WHERE tg_id=? AND date=? AND completed=1", (tg_id, d))
+                if w:
+                    streak += 1
+                elif i > 0:
+                    break
+            total = fetchone(conn,
+                "SELECT COUNT(*) as cnt FROM workouts WHERE tg_id=? AND completed=1", (tg_id,))["cnt"]
+            week_count = fetchone(conn,
+                "SELECT COUNT(*) as cnt FROM workouts WHERE tg_id=? AND completed=1 AND date >= ?",
+                (tg_id, monday))["cnt"]
+            is_rest = week_count >= u["days_per_week"]
+            result.append({"tg_id": tg_id, "streak": streak, "total": total, "is_rest_day": is_rest})
     return {"users": result}
 
 
