@@ -15,7 +15,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 TG_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 TMA_URL = "https://gains-tma.vercel.app/"
 CHANNEL_URL = os.getenv("GAINS_CHANNEL", "")
-SUPPORT_USERNAME = os.getenv("SUPPORT_USERNAME", "gainsfitnessbot")
+SUPPORT_USERNAME = os.getenv("SUPPORT_USERNAME", "alekseimedia")
 
 # --- DATABASE ---
 DATABASE_URL = os.getenv("DATABASE_URL", "")
@@ -581,6 +581,9 @@ async def tg_answer_cb(cb_id: str, text: str = ""):
             json={"callback_query_id": cb_id, "text": text}, timeout=5)
 
 
+PRICE_RUB = 290
+PRICE_STARS = 150
+
 START_TEXT = (
     "Твой тренировочный трекер.\n\n"
     "Вводишь вес — я запоминаю.\n"
@@ -589,7 +592,21 @@ START_TEXT = (
     "• Адаптация нагрузки под твой результат\n"
     "• Прогресс за неделю и месяц\n"
     "• Стрик тренировок\n\n"
-    "<b>Первые 3 тренировки бесплатно. Потом 490₽/мес.</b>"
+    f"<b>Первые 3 тренировки бесплатно. Потом {PRICE_RUB}₽/мес ({PRICE_STARS} ⭐).</b>"
+)
+
+STARS_HOWTO = (
+    "⭐ <b>Как купить Telegram Stars</b>\n\n"
+    "<b>Способ 1 — через бот (проще всего):</b>\n"
+    "1. Открой @PremiumBot\n"
+    "2. Выбери «Купить Stars»\n"
+    "3. Выбери количество (нужно 150+)\n"
+    "4. Оплати картой RU или СБП\n\n"
+    "<b>Способ 2 — прямо в Telegram:</b>\n"
+    "Настройки → Stars → Пополнить → выбери пакет\n\n"
+    "<b>Способ 3 — Fragment.com:</b>\n"
+    "fragment.com → Stars → оплата TON или картой\n\n"
+    f"После покупки Stars — возвращайся в GAINS и нажми «Оформить подписку» ({PRICE_STARS} ⭐ = {PRICE_RUB}₽)"
 )
 
 FAQ_TEXT = (
@@ -621,13 +638,17 @@ async def telegram_webhook(request: Request):
 
         if text.startswith("/start"):
             keyboard = {"inline_keyboard": [
-                [{"text": "💪 Открыть GAINS", "web_app": {"url": TMA_URL}}],
-                [{"text": "❓ FAQ", "callback_data": "faq"},
-                 {"text": "💳 Подписка", "callback_data": "sub"}],
+                [{"text": "💪 Начать тренировку", "web_app": {"url": TMA_URL}}],
+                [{"text": "⭐ Как купить Stars?", "callback_data": "stars"},
+                 {"text": "❓ FAQ", "callback_data": "faq"}],
+                [{"text": "💬 Поддержка", "url": f"https://t.me/{SUPPORT_USERNAME}"}],
             ]}
             if CHANNEL_URL:
                 keyboard["inline_keyboard"].append([{"text": "📢 Канал", "url": CHANNEL_URL}])
             await tg_send(chat_id, f"Привет, {first_name}! 👋\n\n{START_TEXT}", keyboard)
+
+        elif text.startswith("/stars"):
+            await tg_send(chat_id, STARS_HOWTO)
 
         elif text.startswith("/help") or text.startswith("/faq"):
             await tg_send(chat_id, FAQ_TEXT)
@@ -644,9 +665,11 @@ async def telegram_webhook(request: Request):
 
         if data_cb == "faq":
             await tg_send(chat_id, FAQ_TEXT)
+        elif data_cb == "stars":
+            await tg_send(chat_id, STARS_HOWTO)
         elif data_cb == "sub":
             await tg_send(chat_id,
-                "💳 <b>Подписка GAINS</b>\n\n490₽/мес (~200 ⭐ Stars)\n\n"
+                f"💳 <b>Подписка GAINS</b>\n\n{PRICE_RUB}₽/мес ({PRICE_STARS} ⭐ Stars)\n\n"
                 "Оформить в приложении: Профиль → Оформить подписку",
                 {"inline_keyboard": [[{"text": "💪 Открыть GAINS", "web_app": {"url": TMA_URL}}]]})
 
