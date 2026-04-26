@@ -106,9 +106,14 @@ def init_db():
                     notify_hour INTEGER DEFAULT 10,
                     created_at TIMESTAMP DEFAULT NOW(),
                     trial_start TEXT,
-                    is_premium INTEGER DEFAULT 0
+                    is_premium INTEGER DEFAULT 0,
+                    premium_until TEXT
                 )
             """)
+            try:
+                cur.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS premium_until TEXT")
+            except Exception:
+                pass
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS workouts (
                     id SERIAL PRIMARY KEY,
@@ -153,7 +158,8 @@ def init_db():
                 goal TEXT DEFAULT 'mass', level TEXT DEFAULT 'beginner',
                 days_per_week INTEGER DEFAULT 3, body_weight REAL, height REAL,
                 age INTEGER, notify_hour INTEGER DEFAULT 10,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP, trial_start TEXT, is_premium INTEGER DEFAULT 0)""")
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP, trial_start TEXT,
+                is_premium INTEGER DEFAULT 0, premium_until TEXT)""")
             conn.execute("""CREATE TABLE IF NOT EXISTS workouts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, tg_id INTEGER, date TEXT,
                 exercises TEXT, completed INTEGER DEFAULT 0,
@@ -174,6 +180,10 @@ def init_db():
                     pass
             try:
                 conn.execute("ALTER TABLE workouts ADD COLUMN split_day TEXT DEFAULT 'Тренировка'")
+            except Exception:
+                pass
+            try:
+                conn.execute("ALTER TABLE users ADD COLUMN premium_until TEXT")
             except Exception:
                 pass
 
@@ -362,8 +372,11 @@ def get_today_workout(tg_id: int):
 
 
 def _check_sub(tg_id: int, conn) -> str:
-    user = fetchone(conn, "SELECT is_premium FROM users WHERE tg_id=?", (tg_id,))
+    user = fetchone(conn, "SELECT is_premium, premium_until FROM users WHERE tg_id=?", (tg_id,))
     if user and user["is_premium"]:
+        if user["premium_until"] and user["premium_until"] < date.today().isoformat():
+            db_execute(conn, "UPDATE users SET is_premium=0 WHERE tg_id=?", (tg_id,))
+            return "expired"
         return "premium"
     completed = fetchone(conn,
         "SELECT COUNT(*) as cnt FROM workouts WHERE tg_id=? AND completed=1", (tg_id,))["cnt"]
@@ -644,9 +657,11 @@ def check_subscription(tg_id: int):
 
 @app.post("/subscription/{tg_id}/activate")
 def activate_premium(tg_id: int):
+    premium_until = (date.today() + timedelta(days=30)).isoformat()
     with get_db() as conn:
-        db_execute(conn, "UPDATE users SET is_premium=1 WHERE tg_id=?", (tg_id,))
-    return {"ok": True}
+        db_execute(conn, "UPDATE users SET is_premium=1, premium_until=? WHERE tg_id=?",
+                   (premium_until, tg_id))
+    return {"ok": True, "premium_until": premium_until}
 
 
 @app.post("/subscription/{tg_id}/invoice")
@@ -671,6 +686,36 @@ def set_notify(tg_id: int, hour: int):
         raise HTTPException(400, "Invalid hour")
     with get_db() as conn:
         db_execute(conn, "UPDATE users SET notify_hour=? WHERE tg_id=?", (hour, tg_id))
+    return {"ok": True}
+
+
+@app.get("/subscription/expiring")
+def get_expiring():
+    """Users whose premium expires tomorrow or today."""
+    today = date.today().isoformat()
+    tomorrow = (date.today() + timedelta(days=1)).isoformat()
+    with get_db() as conn:
+        users = fetchall(conn,
+            "SELECT tg_id, premium_until FROM users WHERE is_premium=1 AND premium_until IN (?, ?)",
+            (today, tomorrow))
+    return {"users": [{"tg_id": u["tg_id"], "premium_until": u["premium_until"],
+                        "expires_today": u["premium_until"] == today} for u in users]}
+
+
+@app.delete("/measurements/{tg_id}/{measurement_id}")
+def delete_measurement(tg_id: int, measurement_id: int):
+    with get_db() as conn:
+        db_execute(conn,
+            "DELETE FROM body_measurements WHERE id=? AND tg_id=?", (measurement_id, tg_id))
+    return {"ok": True}
+
+
+@app.put("/measurements/{tg_id}/{measurement_id}")
+def update_measurement(tg_id: int, measurement_id: int, data: BodyMeasurement):
+    with get_db() as conn:
+        db_execute(conn,
+            "UPDATE body_measurements SET body_weight=?, waist=?, hips=?, chest=? WHERE id=? AND tg_id=?",
+            (data.body_weight, data.waist, data.hips, data.chest, measurement_id, tg_id))
     return {"ok": True}
 
 
@@ -784,8 +829,10 @@ async def telegram_webhook(request: Request):
             tg_id = msg["from"]["id"]
             payload = msg["successful_payment"].get("invoice_payload", "")
             if payload.startswith("premium_"):
+                premium_until = (date.today() + timedelta(days=30)).isoformat()
                 with get_db() as conn:
-                    db_execute(conn, "UPDATE users SET is_premium=1 WHERE tg_id=?", (tg_id,))
+                    db_execute(conn, "UPDATE users SET is_premium=1, premium_until=? WHERE tg_id=?",
+                               (premium_until, tg_id))
                 await tg_send(chat_id,
                     "✅ <b>GAINS Premium активирован!</b>\n\nТренируйся без ограничений 💪",
                     {"inline_keyboard": [[{"text": "Открыть GAINS 💪", "web_app": {"url": TMA_URL}}]]})

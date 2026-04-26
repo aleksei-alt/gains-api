@@ -16,6 +16,31 @@ if not BOT_TOKEN:
 MSK = timezone(timedelta(hours=3))
 hour = datetime.now(MSK).hour
 
+# --- Check expiring subscriptions (runs on every cron tick) ---
+try:
+    exp = requests.get(f"{API}/subscription/expiring", timeout=10).json()
+    for u in exp.get("users", []):
+        tg_id = u["tg_id"]
+        if u["expires_today"]:
+            text = ("⚠️ <b>Подписка GAINS истекла</b>\n\n"
+                    "Продли чтобы не потерять прогресс и streak.\n"
+                    "290₽/мес — меньше чашки кофе.")
+        else:
+            text = ("🔔 <b>Подписка GAINS заканчивается завтра</b>\n\n"
+                    "Продли заранее чтобы не прерывать тренировки.")
+        requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage", json={
+            "chat_id": tg_id,
+            "text": text,
+            "parse_mode": "HTML",
+            "reply_markup": {"inline_keyboard": [[{
+                "text": "Продлить подписку ⭐",
+                "web_app": {"url": "https://gains-tma.vercel.app/"}
+            }]]}
+        }, timeout=10)
+        print(f"  [expiring] ✓ {tg_id} (today={u['expires_today']})")
+except Exception as e:
+    print(f"[gains-notify] expiring check error: {e}")
+
 try:
     resp = requests.get(f"{API}/notify/due", params={"hour": hour}, timeout=10)
     resp.raise_for_status()

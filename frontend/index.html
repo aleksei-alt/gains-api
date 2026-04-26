@@ -1791,8 +1791,14 @@ async function loadMeasurements() {
     <div class="screen-subtitle" style="margin-bottom:10px">История</div>
     <div class="measure-history">
       ${rows.map(r => `
-      <div class="measure-row">
-        <div class="measure-row-date">${r.date}</div>
+      <div class="measure-row" id="mrow-${r.id}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div class="measure-row-date">${r.date}</div>
+          <div style="display:flex;gap:8px">
+            <button onclick="editMeasurement(${r.id},'${r.date}',${r.body_weight||'null'},${r.waist||'null'},${r.hips||'null'},${r.chest||'null'})" style="background:none;border:none;color:var(--text-3);font-size:16px;cursor:pointer;padding:2px 6px">✏️</button>
+            <button onclick="deleteMeasurement(${r.id})" style="background:none;border:none;color:var(--danger);font-size:16px;cursor:pointer;padding:2px 6px">🗑️</button>
+          </div>
+        </div>
         <div class="measure-row-data">
           ${r.body_weight ? `<div class="measure-item">Вес: <span>${r.body_weight} кг</span></div>` : ''}
           ${r.waist ? `<div class="measure-item">Талия: <span>${r.waist} см</span></div>` : ''}
@@ -1800,7 +1806,50 @@ async function loadMeasurements() {
           ${r.chest ? `<div class="measure-item">Грудь: <span>${r.chest} см</span></div>` : ''}
         </div>
       </div>`).join('')}
-    </div>` : `<div style="color:var(--text-2);font-size:14px;text-align:center;margin-top:20px">Записывай замеры каждую неделю — увидишь прогресс даже когда весы стоят</div>`}`;
+    </div>` : `<div style="color:var(--text-2);font-size:14px;text-align:center;margin-top:20px">Записывай замеры раз в неделю — увидишь прогресс даже когда весы стоят</div>`}`;
+}
+
+async function deleteMeasurement(id) {
+  await fetchWithTimeout(`${API}/measurements/${TG_ID}/${id}`, { method: 'DELETE' }).catch(() => {});
+  showToast('Удалено', '');
+  loadMeasurements();
+}
+
+function editMeasurement(id, date, w, wst, hps, ch) {
+  if (document.getElementById('edit-measure-modal')) return;
+  const el = document.createElement('div');
+  el.id = 'edit-measure-modal';
+  el.className = 'edit-modal-overlay';
+  el.innerHTML = `
+    <div class="edit-modal">
+      <div class="edit-modal-title">Изменить замеры</div>
+      <div style="font-size:12px;color:var(--text-3);margin-bottom:14px">${date}</div>
+      <div class="measure-grid" style="margin-bottom:16px">
+        <div class="measure-field"><label>Вес тела (кг)</label><input type="number" id="em-weight" step="0.1" value="${w!=='null'?w:''}" placeholder="70.0"></div>
+        <div class="measure-field"><label>Талия (см)</label><input type="number" id="em-waist" value="${wst!=='null'?wst:''}" placeholder="80"></div>
+        <div class="measure-field"><label>Бёдра (см)</label><input type="number" id="em-hips" value="${hps!=='null'?hps:''}" placeholder="95"></div>
+        <div class="measure-field"><label>Грудь (см)</label><input type="number" id="em-chest" value="${ch!=='null'?ch:''}" placeholder="90"></div>
+      </div>
+      <button class="btn-primary" onclick="saveEditMeasurement(${id})">Сохранить</button>
+      <button onclick="document.getElementById('edit-measure-modal').remove()" style="width:100%;background:transparent;border:none;padding:12px;color:var(--text-3);font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:4px">Отмена</button>
+    </div>`;
+  document.body.appendChild(el);
+}
+
+async function saveEditMeasurement(id) {
+  const data = {
+    tg_id: TG_ID,
+    body_weight: parseFloat(document.getElementById('em-weight').value) || null,
+    waist: parseFloat(document.getElementById('em-waist').value) || null,
+    hips: parseFloat(document.getElementById('em-hips').value) || null,
+    chest: parseFloat(document.getElementById('em-chest').value) || null,
+  };
+  await fetchWithTimeout(`${API}/measurements/${TG_ID}/${id}`, {
+    method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
+  }).catch(() => {});
+  document.getElementById('edit-measure-modal')?.remove();
+  showToast('Замеры обновлены ✓', 'success');
+  loadMeasurements();
 }
 
 async function saveMeasurement() {
