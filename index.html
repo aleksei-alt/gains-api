@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>GAINS</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    :root {
+      --bg: #0a0a0a;
+      --surface: #141414;
+      --card: #1a1a1a;
+      --border: #2a2a2a;
+      --accent: #aaff00;
+      --accent-dim: #7acc00;
+      --text: #ffffff;
+      --text-secondary: #888;
+      --danger: #ff4444;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* SCREENS */
+    .screen { display: none; min-height: 100vh; }
+    .screen.active { display: flex; flex-direction: column; }
+
+    /* ONBOARDING */
+    #onboarding {
+      padding: 40px 24px 32px;
+      justify-content: space-between;
+    }
+
+    .onboard-header { text-align: center; margin-bottom: 8px; }
+    .onboard-header .logo {
+      font-size: 42px;
+      font-weight: 900;
+      color: var(--accent);
+      letter-spacing: -2px;
+    }
+    .onboard-header .tagline {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    .onboard-step { display: none; }
+    .onboard-step.active { display: block; }
+
+    .step-title {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .step-subtitle {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 24px;
+    }
+
+    .options { display: flex; flex-direction: column; gap: 12px; }
+    .option-btn {
+      background: var(--card);
+      border: 2px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 20px;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: left;
+    }
+    .option-btn:active { transform: scale(0.98); }
+    .option-btn.selected {
+      border-color: var(--accent);
+      background: rgba(170,255,0,0.08);
+    }
+    .option-btn .opt-title { font-size: 16px; font-weight: 600; }
+    .option-btn .opt-desc { font-size: 13px; color: var(--text-secondary); margin-top: 2px; }
+
+    .days-selector {
+      display: flex;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .day-btn {
+      flex: 1;
+      background: var(--card);
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 8px;
+      cursor: pointer;
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+      transition: all 0.15s;
+    }
+    .day-btn.selected { border-color: var(--accent); color: var(--accent); background: rgba(170,255,0,0.08); }
+
+    /* BOTTOM BUTTONS */
+    .bottom-area { padding: 16px 0 0; }
+    .btn-primary {
+      width: 100%;
+      background: var(--accent);
+      color: #000;
+      border: none;
+      border-radius: 14px;
+      padding: 16px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-primary:active { transform: scale(0.98); background: var(--accent-dim); }
+    .btn-primary:disabled { opacity: 0.4; }
+
+    /* NAV */
+    .nav {
+      display: flex;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      position: fixed;
+      bottom: 0;
+      left: 0; right: 0;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    .nav-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 10px 0 8px;
+      cursor: pointer;
+      color: var(--text-secondary);
+      font-size: 11px;
+      gap: 4px;
+      transition: color 0.15s;
+    }
+    .nav-item.active { color: var(--accent); }
+    .nav-item svg { width: 22px; height: 22px; }
+
+    /* MAIN SCREENS */
+    .main-screen {
+      padding: 20px 20px 80px;
+      flex: 1;
+      overflow-y: auto;
+    }
+
+    .screen-title {
+      font-size: 26px;
+      font-weight: 800;
+      margin-bottom: 4px;
+    }
+    .screen-subtitle { font-size: 14px; color: var(--text-secondary); margin-bottom: 20px; }
+
+    /* TODAY SCREEN */
+    .rest-day {
+      text-align: center;
+      padding: 60px 20px;
+    }
+    .rest-day .icon { font-size: 56px; margin-bottom: 16px; }
+    .rest-day h2 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+    .rest-day p { color: var(--text-secondary); font-size: 15px; }
+
+    .exercise-card {
+      background: var(--card);
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 10px;
+      border: 1px solid var(--border);
+    }
+    .exercise-card.done { border-color: var(--accent); opacity: 0.7; }
+    .ex-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .ex-name { font-size: 16px; font-weight: 600; }
+    .ex-target { font-size: 13px; color: var(--accent); font-weight: 600; }
+    .ex-inputs { display: flex; gap: 8px; align-items: center; }
+    .ex-input-group { flex: 1; }
+    .ex-input-label { font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; }
+    .ex-input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      color: var(--text);
+      font-size: 16px;
+      font-weight: 600;
+      text-align: center;
+    }
+    .ex-input:focus { outline: none; border-color: var(--accent); }
+    .log-btn {
+      background: var(--accent);
+      color: #000;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      white-space: nowrap;
+      margin-top: 18px;
+    }
+    .log-btn:active { transform: scale(0.97); }
+    .log-btn.logged { background: var(--border); color: var(--text-secondary); }
+
+    .finish-btn {
+      width: 100%;
+      background: var(--accent);
+      color: #000;
+      border: none;
+      border-radius: 14px;
+      padding: 16px;
+      font-size: 17px;
+      font-weight: 800;
+      cursor: pointer;
+      margin-top: 16px;
+      display: none;
+    }
+    .finish-btn:active { transform: scale(0.98); }
+
+    .loading-state {
+      text-align: center;
+      padding: 60px 20px;
+    }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 16px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* PROGRESS SCREEN */
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+    .stat-card {
+      background: var(--card);
+      border-radius: 14px;
+      padding: 16px;
+      border: 1px solid var(--border);
+    }
+    .stat-value { font-size: 32px; font-weight: 800; color: var(--accent); }
+    .stat-label { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+    .exercise-row {
+      background: var(--card);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 8px;
+      border: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .exercise-row .ex-row-name { font-size: 15px; font-weight: 600; }
+    .exercise-row .ex-row-weight { font-size: 15px; font-weight: 700; color: var(--accent); }
+
+    /* PROFILE SCREEN */
+    .profile-section {
+      background: var(--card);
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+    .profile-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .profile-row:last-child { border-bottom: none; }
+    .profile-row-label { font-size: 15px; }
+    .profile-row-value { font-size: 15px; color: var(--text-secondary); }
+
+    .subscription-card {
+      background: linear-gradient(135deg, #1a2200, #0d1a00);
+      border: 1px solid var(--accent);
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .sub-status { font-size: 13px; color: var(--accent); font-weight: 600; margin-bottom: 4px; }
+    .sub-title { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+    .sub-desc { font-size: 13px; color: var(--text-secondary); margin-bottom: 16px; }
+
+    .stars-btn {
+      background: var(--accent);
+      color: #000;
+      border: none;
+      border-radius: 12px;
+      padding: 14px;
+      width: 100%;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    /* MEASUREMENTS */
+    .measure-form { background: var(--card); border-radius: 14px; padding: 16px; border: 1px solid var(--border); margin-bottom: 16px; }
+    .measure-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+    .measure-field label { font-size: 12px; color: var(--text-secondary); display: block; margin-bottom: 4px; }
+    .measure-field input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px; color: var(--text); font-size: 16px; }
+    .measure-field input:focus { outline: none; border-color: var(--accent); }
+    .measure-history { margin-top: 16px; }
+    .measure-row { background: var(--card); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; border: 1px solid var(--border); }
+    .measure-row-date { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+    .measure-row-data { display: flex; gap: 16px; flex-wrap: wrap; }
+    .measure-item { font-size: 14px; }
+    .measure-item span { color: var(--accent); font-weight: 700; }
+
+    /* REST TIMER */
+    .rest-timer { background: var(--surface); border-radius: 12px; padding: 12px 16px; margin-top: 10px; display: none; align-items: center; gap: 12px; border: 1px solid var(--border); }
+    .rest-timer.active { display: flex; }
+    .timer-count { font-size: 24px; font-weight: 800; color: var(--accent); min-width: 48px; }
+    .timer-label { font-size: 13px; color: var(--text-secondary); flex: 1; }
+    .timer-skip { background: none; border: 1px solid var(--border); border-radius: 8px; padding: 6px 12px; color: var(--text-secondary); font-size: 13px; cursor: pointer; }
+
+    /* TOAST */
+    .toast {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-80px);
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      z-index: 1000;
+      transition: transform 0.3s ease;
+      white-space: nowrap;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+    .toast.success { border-color: var(--accent); color: var(--accent); }
+  </style>
+</head>
+<body>
+
+<!-- ONBOARDING -->
+<div id="onboarding" class="screen active">
+  <div style="position:absolute;top:6px;right:10px;font-size:10px;opacity:0.35;color:white;z-index:99">v10</div>
+  <div>
+    <div class="onboard-header">
+      <div class="logo">GAINS</div>
+      <div class="tagline">Твой тренировочный партнёр</div>
+    </div>
+
+    <!-- Step 1: Location -->
+    <div class="onboard-step active" id="step-location">
+      <div class="step-title">Где тренируешься?</div>
+      <div class="step-subtitle">Подберём упражнения под твои условия</div>
+      <div class="options">
+        <div class="option-btn" data-val="gym" onclick="selectOption(this,'location')">
+          <div class="opt-title">В зале</div>
+          <div class="opt-desc">Штанга, гантели, тренажёры</div>
+        </div>
+        <div class="option-btn" data-val="home" onclick="selectOption(this,'location')">
+          <div class="opt-title">Дома</div>
+          <div class="opt-desc">Упражнения с весом тела</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: Goal -->
+    <div class="onboard-step" id="step-goal">
+      <div class="step-title">Твоя цель</div>
+      <div class="step-subtitle">Выберём программу под тебя</div>
+      <div class="options">
+        <div class="option-btn" data-val="weight_loss" onclick="selectOption(this,'goal')">
+          <div class="opt-title">Сбросить вес</div>
+          <div class="opt-desc">Похудеть и привести тело в форму</div>
+        </div>
+        <div class="option-btn" data-val="mass" onclick="selectOption(this,'goal')">
+          <div class="opt-title">Набор массы</div>
+          <div class="opt-desc">Больше объёма, прогрессия нагрузки</div>
+        </div>
+        <div class="option-btn" data-val="strength" onclick="selectOption(this,'goal')">
+          <div class="opt-title">Сила</div>
+          <div class="opt-desc">Базовые упражнения с максимальным весом</div>
+        </div>
+        <div class="option-btn" data-val="cut" onclick="selectOption(this,'goal')">
+          <div class="opt-title">Рельеф</div>
+          <div class="opt-desc">Сохранить мышцы, убрать жир</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 4: Level -->
+    <div class="onboard-step" id="step-level">
+      <div class="step-title">Твой уровень</div>
+      <div class="step-subtitle">Как давно тренируешься</div>
+      <div class="options">
+        <div class="option-btn" data-val="beginner" onclick="selectOption(this,'level')">
+          <div class="opt-title">Новичок</div>
+          <div class="opt-desc">До 1 года или с перерывом</div>
+        </div>
+        <div class="option-btn" data-val="intermediate" onclick="selectOption(this,'level')">
+          <div class="opt-title">Средний</div>
+          <div class="opt-desc">1–3 года стабильных тренировок</div>
+        </div>
+        <div class="option-btn" data-val="advanced" onclick="selectOption(this,'level')">
+          <div class="opt-title">Продвинутый</div>
+          <div class="opt-desc">3+ лет, знаю технику</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 5: Days -->
+    <div class="onboard-step" id="step-days">
+      <div class="step-title">Как часто тренируешься?</div>
+      <div class="step-subtitle">Дней в неделю</div>
+      <div class="days-selector">
+        <button class="day-btn" data-val="3" onclick="selectDay(this)">3</button>
+        <button class="day-btn" data-val="4" onclick="selectDay(this)">4</button>
+        <button class="day-btn" data-val="5" onclick="selectDay(this)">5</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-area">
+    <button class="btn-primary" id="onboard-next-btn" onclick="onboardNext()" disabled>Далее</button>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app" class="screen">
+
+  <!-- TODAY -->
+  <div id="tab-today" class="main-screen">
+    <div class="screen-title">Сегодня</div>
+    <div class="screen-subtitle" id="today-date"></div>
+    <div id="workout-content"></div>
+  </div>
+
+  <!-- PROGRESS -->
+  <div id="tab-progress" class="main-screen" style="display:none">
+    <div class="screen-title">Прогресс</div>
+    <div class="screen-subtitle">Твои результаты</div>
+    <div id="progress-content"></div>
+  </div>
+
+  <!-- PROFILE -->
+  <div id="tab-profile" class="main-screen" style="display:none">
+    <div class="screen-title">Профиль</div>
+    <div class="screen-subtitle" id="profile-name"></div>
+    <div id="profile-content"></div>
+  </div>
+
+  <!-- MEASUREMENTS TAB -->
+  <div id="tab-measurements" class="main-screen" style="display:none">
+    <div class="screen-title">Замеры</div>
+    <div class="screen-subtitle">Отслеживай изменения тела</div>
+    <div id="measurements-content"></div>
+  </div>
+
+  <!-- NAV -->
+  <nav class="nav">
+    <div class="nav-item active" onclick="switchTab('today', this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+      </svg>
+      Тренировка
+    </div>
+    <div class="nav-item" onclick="switchTab('measurements', this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M3 12h18M3 6h18M3 18h18"/>
+      </svg>
+      Замеры
+    </div>
+    <div class="nav-item" onclick="switchTab('progress', this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+      Прогресс
+    </div>
+    <div class="nav-item" onclick="switchTab('profile', this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+      </svg>
+      Профиль
+    </div>
+  </nav>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+const tg = window.Telegram.WebApp;
+tg.ready();
+tg.expand();
+
+const API = '';
+const TG_ID = tg.initDataUnsafe?.user?.id || 999999; // fallback for testing
+
+let state = {
+  location: null,
+  goal: null,
+  level: null,
+  days: null,
+  currentStep: 'location',
+  workout: null,
+  loggedExercises: new Set()
+};
+
+const steps = ['location', 'goal', 'level', 'days'];
+
+// --- ONBOARDING ---
+function selectOption(el, type) {
+  el.closest('.options').querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  state[type] = el.dataset.val;
+  document.getElementById('onboard-next-btn').disabled = false;
+}
+
+function selectDay(el) {
+  document.querySelectorAll('.day-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  state.days = parseInt(el.dataset.val);
+  document.getElementById('onboard-next-btn').disabled = false;
+}
+
+function onboardNext() {
+  const currentIdx = steps.indexOf(state.currentStep);
+
+  if (currentIdx < steps.length - 1) {
+    document.getElementById(`step-${state.currentStep}`).classList.remove('active');
+    state.currentStep = steps[currentIdx + 1];
+    document.getElementById(`step-${state.currentStep}`).classList.add('active');
+    document.getElementById('onboard-next-btn').disabled = true;
+    document.getElementById('onboard-next-btn').textContent =
+      state.currentStep === 'days' ? 'Начать' : 'Далее';
+  } else {
+    finishOnboarding();
+  }
+}
+
+async function finishOnboarding() {
+  const btn = document.getElementById('onboard-next-btn');
+  btn.textContent = 'Сохраняем...';
+  btn.disabled = true;
+
+  // wait for setup (Railway = 0.4s), abort at 4s max
+  const ctrl = new AbortController();
+  setTimeout(() => ctrl.abort(), 4000);
+  await fetch(`${API}/users/setup`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      tg_id: TG_ID,
+      location: state.location,
+      goal: state.goal,
+      level: state.level,
+      days_per_week: state.days
+    }),
+    signal: ctrl.signal
+  }).catch(() => {});
+
+  showApp();
+}
+
+async function fetchWithTimeout(url, opts = {}, ms = 8000) {
+  const ctrl = new AbortController();
+  const tid = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const r = await fetch(url, { ...opts, signal: ctrl.signal });
+    clearTimeout(tid);
+    return r;
+  } catch(e) {
+    clearTimeout(tid);
+    throw e;
+  }
+}
+
+// --- APP ---
+async function checkUser() {
+  try {
+    const r = await fetchWithTimeout(`${API}/users/${TG_ID}`);
+    if (r.ok) {
+      showApp();
+    } else {
+      showOnboarding();
+    }
+  } catch {
+    showOnboarding();
+  }
+}
+
+function showOnboarding() {
+  document.getElementById('onboarding').classList.add('active');
+  document.getElementById('app').classList.remove('active');
+}
+
+function showApp() {
+  const ob = document.getElementById('onboarding');
+  const ap = document.getElementById('app');
+  if (ob) ob.style.display = 'none';
+  if (ap) { ap.style.display = 'flex'; ap.style.flexDirection = 'column'; }
+  loadToday();
+  loadProfile();
+}
+
+function switchTab(tab, el) {
+  document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-today').style.display = tab === 'today' ? 'block' : 'none';
+  document.getElementById('tab-measurements').style.display = tab === 'measurements' ? 'block' : 'none';
+  document.getElementById('tab-progress').style.display = tab === 'progress' ? 'block' : 'none';
+  document.getElementById('tab-profile').style.display = tab === 'profile' ? 'block' : 'none';
+  if (tab === 'progress') loadProgress();
+  if (tab === 'measurements') loadMeasurements();
+}
+
+// --- TODAY ---
+async function loadToday() {
+  const d = new Date();
+  document.getElementById('today-date').textContent =
+    d.toLocaleDateString('ru', {weekday:'long', day:'numeric', month:'long'});
+
+  document.getElementById('workout-content').innerHTML = `
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <div style="color:var(--text-secondary)">Составляю тренировку...</div>
+    </div>`;
+
+  try {
+    const r = await fetchWithTimeout(`${API}/workout/today/${TG_ID}`, {}, 15000);
+    const data = await r.json();
+    state.workout = data.workout;
+    renderWorkout(data);
+  } catch(e) {
+    document.getElementById('workout-content').innerHTML =
+      `<div class="loading-state"><div style="color:var(--danger)">Ошибка загрузки. Проверь соединение.</div></div>`;
+  }
+}
+
+function renderWorkout(data) {
+  const workout = data.workout;
+  let exercises = [];
+  try { exercises = JSON.parse(workout.exercises); } catch { exercises = []; }
+
+  if (!exercises.length) {
+    document.getElementById('workout-content').innerHTML =
+      `<div class="rest-day"><div class="icon">🛌</div><h2>День отдыха</h2><p>Восстановление — часть прогресса</p></div>`;
+    return;
+  }
+
+  const loggedSet = new Set(data.logs?.map(l => l.exercise) || []);
+
+  let html = '';
+  exercises.forEach((ex, i) => {
+    const isLogged = loggedSet.has(ex.exercise);
+    if (isLogged) state.loggedExercises.add(ex.exercise);
+    html += `
+    <div class="exercise-card ${isLogged ? 'done' : ''}" id="card-${i}">
+      <div class="ex-header">
+        <div class="ex-name">${ex.exercise}</div>
+        <div class="ex-target">${ex.sets}×${ex.reps} @ ${ex.weight}кг</div>
+      </div>
+      <div class="ex-inputs">
+        <div class="ex-input-group">
+          <div class="ex-input-label">Подходы</div>
+          <input class="ex-input" type="number" id="sets-${i}" value="${ex.sets}" min="1" max="10">
+        </div>
+        <div class="ex-input-group">
+          <div class="ex-input-label">Повторения</div>
+          <input class="ex-input" type="number" id="reps-${i}" value="${ex.reps}" min="1" max="50">
+        </div>
+        <div class="ex-input-group">
+          <div class="ex-input-label">Вес (кг)</div>
+          <input class="ex-input" type="number" id="weight-${i}" value="${ex.weight}" min="0" step="2.5">
+        </div>
+      </div>
+      <button class="log-btn ${isLogged ? 'logged' : ''}" onclick="logExercise(${i}, '${ex.exercise}', ${ex.rest_seconds || 90})" ${isLogged ? 'disabled' : ''}>
+        ${isLogged ? '✓ Записано' : 'Записать'}
+      </button>
+      <div class="rest-timer" id="timer-${i}">
+        <div class="timer-count">90s</div>
+        <div class="timer-label">Отдых между подходами</div>
+        <button class="timer-skip" onclick="skipTimer(${i})">Пропустить</button>
+      </div>
+    </div>`;
+  });
+
+  html += `<button class="finish-btn" id="finish-btn" onclick="finishWorkout()">🏁 Завершить тренировку</button>`;
+
+  document.getElementById('workout-content').innerHTML = html;
+  checkFinishButton(exercises.length);
+}
+
+async function logExercise(idx, name, restSeconds = 90) {
+  const sets = parseInt(document.getElementById(`sets-${idx}`).value);
+  const reps = parseInt(document.getElementById(`reps-${idx}`).value);
+  const weight = parseFloat(document.getElementById(`weight-${idx}`).value);
+
+  await fetchWithTimeout(`${API}/workout/log`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      tg_id: TG_ID,
+      workout_id: state.workout.id,
+      exercise: name,
+      sets, reps, weight
+    })
+  }).catch(() => {});
+
+  state.loggedExercises.add(name);
+  const card = document.getElementById(`card-${idx}`);
+  card.classList.add('done');
+  const btn = card.querySelector('.log-btn');
+  btn.textContent = '✓ Записано';
+  btn.classList.add('logged');
+  btn.disabled = true;
+
+  showToast('Записано!', 'success');
+  startRestTimer(restSeconds, idx);
+
+  const exercises = JSON.parse(state.workout.exercises);
+  checkFinishButton(exercises.length);
+}
+
+function checkFinishButton(total) {
+  const btn = document.getElementById('finish-btn');
+  if (btn && state.loggedExercises.size >= total) {
+    btn.style.display = 'block';
+  }
+}
+
+async function finishWorkout() {
+  await fetchWithTimeout(`${API}/workout/${state.workout.id}/complete`, { method: 'POST' }).catch(() => {});
+  tg.HapticFeedback.notificationOccurred('success');
+  showToast('Тренировка завершена! 💪', 'success');
+  document.getElementById('finish-btn').textContent = '✅ Завершено';
+  document.getElementById('finish-btn').disabled = true;
+}
+
+// --- PROGRESS ---
+async function loadProgress() {
+  document.getElementById('progress-content').innerHTML = `
+    <div class="loading-state"><div class="spinner"></div></div>`;
+
+  const r = await fetchWithTimeout(`${API}/progress/${TG_ID}`);
+  const data = await r.json();
+
+  let exHtml = '';
+  if (data.top_exercises?.length) {
+    exHtml = `<div class="screen-subtitle" style="margin-top:20px;margin-bottom:12px">Лучшие веса</div>`;
+    data.top_exercises.forEach(ex => {
+      exHtml += `
+      <div class="exercise-row">
+        <div class="ex-row-name">${ex.exercise}</div>
+        <div class="ex-row-weight">${ex.max_weight} кг</div>
+      </div>`;
+    });
+  } else {
+    exHtml = `<div style="color:var(--text-secondary);font-size:14px;text-align:center;margin-top:24px">
+      Запиши первую тренировку — здесь появится прогресс
+    </div>`;
+  }
+
+  document.getElementById('progress-content').innerHTML = `
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value">${data.streak}</div>
+        <div class="stat-label">🔥 Дней подряд</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value">${data.total_workouts}</div>
+        <div class="stat-label">Тренировок</div>
+      </div>
+    </div>
+    ${exHtml}`;
+}
+
+// --- PROFILE ---
+async function loadProfile() {
+  try {
+  const [userR, subR] = await Promise.all([
+    fetchWithTimeout(`${API}/users/${TG_ID}`),
+    fetchWithTimeout(`${API}/subscription/${TG_ID}`)
+  ]);
+  const user = await userR.json();
+  const sub = await subR.json();
+
+  const goalMap = {mass:'Набор массы', strength:'Сила', cut:'Рельеф'};
+  const levelMap = {beginner:'Новичок', intermediate:'Средний', advanced:'Продвинутый'};
+
+  const name = tg.initDataUnsafe?.user?.first_name || 'Атлет';
+  document.getElementById('profile-name').textContent = name;
+
+  let subHtml = '';
+  if (sub.status === 'trial') {
+    const wLeft = sub.workouts_left;
+    subHtml = `
+    <div class="subscription-card">
+      <div class="sub-status">БЕСПЛАТНЫЙ ДОСТУП</div>
+      <div class="sub-title">Осталось ${wLeft} ${wLeft === 1 ? 'тренировка' : wLeft < 5 ? 'тренировки' : 'тренировок'} бесплатно</div>
+      <div class="sub-desc">Попробуй — потом 390₽/мес если понравится</div>
+      <button class="stars-btn" onclick="payStars()">⭐ Подписаться — 390₽</button>
+    </div>`;
+  } else if (sub.status === 'premium') {
+    subHtml = `
+    <div class="subscription-card">
+      <div class="sub-status">✅ PREMIUM</div>
+      <div class="sub-title">Подписка активна</div>
+      <div class="sub-desc">Полный доступ ко всем функциям</div>
+    </div>`;
+  } else {
+    subHtml = `
+    <div class="subscription-card">
+      <div class="sub-status" style="color:var(--danger)">ПОДПИСКА ИСТЕКЛА</div>
+      <div class="sub-title">Продолжи тренировки</div>
+      <div class="sub-desc">390₽/мес — отменить в любой момент</div>
+      <button class="stars-btn" onclick="payStars()">⭐ Возобновить</button>
+    </div>`;
+  }
+
+  document.getElementById('profile-content').innerHTML = `
+    ${subHtml}
+    <div class="profile-section">
+      <div class="profile-row">
+        <div class="profile-row-label">Цель</div>
+        <div class="profile-row-value">${goalMap[user.goal] || user.goal}</div>
+      </div>
+      <div class="profile-row">
+        <div class="profile-row-label">Уровень</div>
+        <div class="profile-row-value">${levelMap[user.level] || user.level}</div>
+      </div>
+      <div class="profile-row">
+        <div class="profile-row-label">Дней в неделю</div>
+        <div class="profile-row-value">${user.days_per_week}</div>
+      </div>
+    </div>`;
+  } catch(e) { console.error('loadProfile error:', e); }
+}
+
+function payStars() {
+  tg.openInvoice('gains_monthly', (status) => {
+    if (status === 'paid') {
+      fetch(`${API}/subscription/${TG_ID}/activate`, { method: 'POST' });
+      showToast('Подписка активирована! 🎉', 'success');
+      loadProfile();
+    }
+  });
+}
+
+// --- REST TIMER ---
+let restInterval = null;
+function startRestTimer(seconds, cardIdx) {
+  const timerId = `timer-${cardIdx}`;
+  const timerEl = document.getElementById(timerId);
+  if (!timerEl) return;
+  timerEl.classList.add('active');
+  let left = seconds;
+  timerEl.querySelector('.timer-count').textContent = left + 's';
+  if (restInterval) clearInterval(restInterval);
+  restInterval = setInterval(() => {
+    left--;
+    timerEl.querySelector('.timer-count').textContent = left + 's';
+    if (left <= 0) {
+      clearInterval(restInterval);
+      timerEl.classList.remove('active');
+      tg.HapticFeedback.notificationOccurred('success');
+      showToast('Время отдыха вышло!');
+    }
+  }, 1000);
+}
+function skipTimer(cardIdx) {
+  if (restInterval) clearInterval(restInterval);
+  const timerEl = document.getElementById(`timer-${cardIdx}`);
+  if (timerEl) timerEl.classList.remove('active');
+}
+
+// --- MEASUREMENTS ---
+async function loadMeasurements() {
+  const rows = await fetchWithTimeout(`${API}/measurements/${TG_ID}`).then(r => r.json()).catch(() => []);
+  const last = rows[0] || {};
+
+  document.getElementById('measurements-content').innerHTML = `
+    <div class="measure-form">
+      <div style="font-size:15px;font-weight:700;margin-bottom:12px">Записать сегодня</div>
+      <div class="measure-grid">
+        <div class="measure-field">
+          <label>Вес тела (кг)</label>
+          <input type="number" id="m-weight" step="0.1" placeholder="${last.body_weight || '70.0'}">
+        </div>
+        <div class="measure-field">
+          <label>Талия (см)</label>
+          <input type="number" id="m-waist" placeholder="${last.waist || '80'}">
+        </div>
+        <div class="measure-field">
+          <label>Бёдра (см)</label>
+          <input type="number" id="m-hips" placeholder="${last.hips || '95'}">
+        </div>
+        <div class="measure-field">
+          <label>Грудь (см)</label>
+          <input type="number" id="m-chest" placeholder="${last.chest || '90'}">
+        </div>
+      </div>
+      <button class="btn-primary" onclick="saveMeasurement()">Сохранить</button>
+    </div>
+    ${rows.length ? `
+    <div class="screen-subtitle" style="margin-bottom:10px">История</div>
+    <div class="measure-history">
+      ${rows.map(r => `
+      <div class="measure-row">
+        <div class="measure-row-date">${r.date}</div>
+        <div class="measure-row-data">
+          ${r.body_weight ? `<div class="measure-item">Вес: <span>${r.body_weight} кг</span></div>` : ''}
+          ${r.waist ? `<div class="measure-item">Талия: <span>${r.waist} см</span></div>` : ''}
+          ${r.hips ? `<div class="measure-item">Бёдра: <span>${r.hips} см</span></div>` : ''}
+          ${r.chest ? `<div class="measure-item">Грудь: <span>${r.chest} см</span></div>` : ''}
+        </div>
+      </div>`).join('')}
+    </div>` : `<div style="color:var(--text-secondary);font-size:14px;text-align:center;margin-top:20px">Записывай замеры каждую неделю — увидишь прогресс даже когда весы стоят</div>`}`;
+}
+
+async function saveMeasurement() {
+  const data = {
+    tg_id: TG_ID,
+    body_weight: parseFloat(document.getElementById('m-weight').value) || null,
+    waist: parseFloat(document.getElementById('m-waist').value) || null,
+    hips: parseFloat(document.getElementById('m-hips').value) || null,
+    chest: parseFloat(document.getElementById('m-chest').value) || null,
+  };
+  await fetchWithTimeout(`${API}/measurements/log`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data)
+  }).catch(() => {});
+  showToast('Замеры сохранены!', 'success');
+  loadMeasurements();
+}
+
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type}`;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// INIT
+checkUser();
+</script>
+</body>
+</html>

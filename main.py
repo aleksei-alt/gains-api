@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from typing import Optional
 import sqlite3, os, anthropic, json
@@ -25,6 +26,9 @@ def init_db():
             goal TEXT DEFAULT 'mass',
             level TEXT DEFAULT 'beginner',
             days_per_week INTEGER DEFAULT 3,
+            body_weight REAL,
+            height REAL,
+            age INTEGER,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             trial_start TEXT,
             is_premium INTEGER DEFAULT 0
@@ -58,6 +62,13 @@ def init_db():
             logged_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
         """)
+    # migrate existing db
+    for col, typ in [("body_weight", "REAL"), ("height", "REAL"), ("age", "INTEGER")]:
+        try:
+            conn.execute(f"ALTER TABLE users ADD COLUMN {col} {typ}")
+            conn.commit()
+        except Exception:
+            pass
 
 init_db()
 
@@ -144,10 +155,13 @@ def get_split_day(days_per_week: int, workout_count: int) -> str:
 
 class UserSetup(BaseModel):
     tg_id: int
-    location: str  # gym / home
-    goal: str      # mass / strength / cut
-    level: str     # beginner / intermediate / advanced
+    location: str
+    goal: str
+    level: str
     days_per_week: int
+    body_weight: Optional[float] = None
+    height: Optional[float] = None
+    age: Optional[int] = None
 
 class ExerciseLog(BaseModel):
     tg_id: int
@@ -170,19 +184,32 @@ def health():
     return {"status": "ok", "service": "gains-api"}
 
 
+@app.get("/app", response_class=HTMLResponse)
+def serve_app():
+    html_path = os.path.join(os.path.dirname(__file__), "index.html")
+    with open(html_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    from fastapi.responses import Response
+    return Response(
+        content=content,
+        media_type="text/html",
+        headers={"Cache-Control": "no-store, must-revalidate", "Pragma": "no-cache"}
+    )
+
+
 @app.post("/users/setup")
 def setup_user(data: UserSetup):
     with db() as conn:
         existing = conn.execute("SELECT * FROM users WHERE tg_id=?", (data.tg_id,)).fetchone()
         if existing:
             conn.execute(
-                "UPDATE users SET location=?, goal=?, level=?, days_per_week=? WHERE tg_id=?",
-                (data.location, data.goal, data.level, data.days_per_week, data.tg_id)
+                "UPDATE users SET location=?, goal=?, level=?, days_per_week=?, body_weight=?, height=?, age=? WHERE tg_id=?",
+                (data.location, data.goal, data.level, data.days_per_week, data.body_weight, data.height, data.age, data.tg_id)
             )
         else:
             conn.execute(
-                "INSERT INTO users (tg_id, location, goal, level, days_per_week, trial_start) VALUES (?,?,?,?,?,?)",
-                (data.tg_id, data.location, data.goal, data.level, data.days_per_week, date.today().isoformat())
+                "INSERT INTO users (tg_id, location, goal, level, days_per_week, body_weight, height, age, trial_start) VALUES (?,?,?,?,?,?,?,?,?)",
+                (data.tg_id, data.location, data.goal, data.level, data.days_per_week, data.body_weight, data.height, data.age, date.today().isoformat())
             )
     return {"ok": True}
 
@@ -281,13 +308,21 @@ def generate_workout(user: dict, history: list, split_day: str) -> str:
 """
         weight_note = "Веса основаны на истории (если есть). Для новичка без истории: приседания 40-50кг, жим лёжа 30-40кг, тяга 40-50кг, гантели 10-15кг."
 
+    body_info = ""
+    if user.get("body_weight"):
+        body_info += f"\n- Вес тела: {user['body_weight']} кг"
+    if user.get("height"):
+        body_info += f"\n- Рост: {user['height']} см"
+    if user.get("age"):
+        body_info += f"\n- Возраст: {user['age']} лет"
+
     prompt = f"""Ты — профессиональный тренер. Составь тренировку.
 
 Пользователь:
 - Место: {location_map[location]}
 - Цель: {goal_map.get(goal, goal)}
 - Уровень: {level_map.get(level, level)}
-- День программы: {split_day}
+- День программы: {split_day}{body_info}
 
 {exercise_pool}
 {history_text}
