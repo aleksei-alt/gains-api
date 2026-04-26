@@ -878,6 +878,104 @@ async def telegram_webhook(request: Request):
     return {"ok": True}
 
 
+ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "gains-admin-2026")
+
+def _check_admin(token: str = ""):
+    if token != ADMIN_TOKEN:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="forbidden")
+
+@app.get("/admin/stats")
+def admin_stats(token: str = ""):
+    _check_admin(token)
+    with get_db() as conn:
+        if IS_PG:
+            cur = conn.cursor()
+            cur.execute("SELECT COUNT(*) FROM users")
+            total_users = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) FROM users WHERE is_premium=1 OR is_premium=true")
+            premium_users = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) FROM users WHERE trial_start IS NOT NULL AND (is_premium=0 OR is_premium=false)")
+            trial_users = cur.fetchone()[0]
+            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            cur.execute("SELECT COUNT(DISTINCT tg_id) FROM workouts WHERE date=%s", (today,))
+            active_today = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) FROM workouts WHERE date=%s", (today,))
+            workouts_today = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) FROM workouts")
+            total_workouts = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) FROM exercise_logs")
+            total_logs = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) FROM body_measurements")
+            total_measurements = cur.fetchone()[0]
+            # New users last 7 days
+            cur.execute("SELECT COUNT(*) FROM users WHERE created_at >= NOW() - INTERVAL '7 days'")
+            new_week = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) FROM users WHERE created_at >= NOW() - INTERVAL '1 day'")
+            new_today = cur.fetchone()[0]
+        else:
+            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            total_users = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+            premium_users = conn.execute("SELECT COUNT(*) FROM users WHERE is_premium=1").fetchone()[0]
+            trial_users = conn.execute("SELECT COUNT(*) FROM users WHERE trial_start IS NOT NULL AND is_premium=0").fetchone()[0]
+            active_today = conn.execute("SELECT COUNT(DISTINCT tg_id) FROM workouts WHERE date=?", (today,)).fetchone()[0]
+            workouts_today = conn.execute("SELECT COUNT(*) FROM workouts WHERE date=?", (today,)).fetchone()[0]
+            total_workouts = conn.execute("SELECT COUNT(*) FROM workouts").fetchone()[0]
+            total_logs = conn.execute("SELECT COUNT(*) FROM exercise_logs").fetchone()[0]
+            total_measurements = conn.execute("SELECT COUNT(*) FROM body_measurements").fetchone()[0]
+            new_week = conn.execute("SELECT COUNT(*) FROM users WHERE created_at >= date('now','-7 days')").fetchone()[0]
+            new_today = conn.execute("SELECT COUNT(*) FROM users WHERE created_at >= date('now','-1 day')").fetchone()[0]
+    return {
+        "total_users": total_users,
+        "premium_users": premium_users,
+        "trial_users": trial_users,
+        "free_users": total_users - premium_users - trial_users,
+        "active_today": active_today,
+        "workouts_today": workouts_today,
+        "total_workouts": total_workouts,
+        "total_logs": total_logs,
+        "total_measurements": total_measurements,
+        "new_today": new_today,
+        "new_week": new_week,
+        "date": today,
+    }
+
+@app.get("/admin/users")
+def admin_users(token: str = "", limit: int = 100, offset: int = 0):
+    _check_admin(token)
+    with get_db() as conn:
+        if IS_PG:
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT u.tg_id, u.location, u.goal, u.level, u.days_per_week,
+                       u.body_weight, u.is_premium, u.premium_until, u.trial_start,
+                       u.created_at,
+                       COUNT(DISTINCT w.id) as workout_count
+                FROM users u
+                LEFT JOIN workouts w ON w.tg_id = u.tg_id
+                GROUP BY u.tg_id
+                ORDER BY u.created_at DESC
+                LIMIT %s OFFSET %s
+            """, (limit, offset))
+            rows = cur.fetchall()
+            cols = [d[0] for d in cur.description]
+        else:
+            rows = conn.execute("""
+                SELECT u.tg_id, u.location, u.goal, u.level, u.days_per_week,
+                       u.body_weight, u.is_premium, u.premium_until, u.trial_start,
+                       u.created_at,
+                       COUNT(DISTINCT w.id) as workout_count
+                FROM users u
+                LEFT JOIN workouts w ON w.tg_id = u.tg_id
+                GROUP BY u.tg_id
+                ORDER BY u.created_at DESC
+                LIMIT ? OFFSET ?
+            """, (limit, offset)).fetchall()
+            cols = ["tg_id","location","goal","level","days_per_week","body_weight","is_premium","premium_until","trial_start","created_at","workout_count"]
+    users = [dict(zip(cols, r)) for r in rows]
+    return {"users": users, "total": len(users)}
+
+
 @app.post("/set-webhook")
 async def set_webhook_manual(url: str):
     """Call this once to register webhook."""

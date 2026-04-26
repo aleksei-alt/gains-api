@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GAINS Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --green: #c6ff00;
+  --green-dim: rgba(198,255,0,0.1);
+  --bg: #060606;
+  --surface: #0f0f11;
+  --surface2: #141416;
+  --border: rgba(255,255,255,0.07);
+  --text: #f0f0f0;
+  --muted: rgba(255,255,255,0.35);
+  --danger: #ff4d4d;
+}
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  min-height: 100vh;
+}
+/* Top bar */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32px;
+  height: 60px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(6,6,6,0.95);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(12px);
+}
+.logo {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 28px;
+  letter-spacing: 4px;
+  background: linear-gradient(90deg, var(--green), #fff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.logo span { color: var(--muted); font-size: 13px; font-family: 'DM Sans', sans-serif; -webkit-text-fill-color: rgba(255,255,255,0.35); margin-left: 8px; font-weight: 600; letter-spacing: 1px; }
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+.badge-live { background: rgba(198,255,0,0.15); color: var(--green); font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; border: 1px solid rgba(198,255,0,0.2); letter-spacing: 0.5px; }
+.refresh-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.refresh-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.15); }
+
+/* Layout */
+.main { padding: 32px; max-width: 1400px; margin: 0 auto; }
+
+/* Stats grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px 20px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+.stat-card:hover { border-color: rgba(255,255,255,0.12); }
+.stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  border-radius: 16px 16px 0 0;
+}
+.stat-card.green::before { background: linear-gradient(90deg, var(--green), transparent); }
+.stat-card.white::before { background: linear-gradient(90deg, rgba(255,255,255,0.4), transparent); }
+.stat-card.dim::before { background: linear-gradient(90deg, rgba(255,255,255,0.1), transparent); }
+
+.stat-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.stat-value {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 52px;
+  line-height: 1;
+  letter-spacing: 2px;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.stat-card.green .stat-value { color: var(--green); }
+.stat-sub { font-size: 12px; color: var(--muted); font-weight: 500; }
+.stat-sub .up { color: var(--green); font-weight: 700; }
+
+/* Section */
+.section-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 20px;
+  letter-spacing: 3px;
+  color: var(--muted);
+  margin-bottom: 16px;
+  text-transform: uppercase;
+}
+
+/* Users table */
+.table-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+thead tr {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+}
+th {
+  padding: 14px 16px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+}
+tbody tr {
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  transition: background 0.1s;
+}
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: rgba(255,255,255,0.025); }
+td {
+  padding: 13px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+td.muted { color: var(--muted); font-size: 13px; }
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+.badge.premium { background: rgba(198,255,0,0.12); color: var(--green); border: 1px solid rgba(198,255,0,0.2); }
+.badge.trial { background: rgba(255,165,0,0.12); color: #ffa500; border: 1px solid rgba(255,165,0,0.2); }
+.badge.free { background: rgba(255,255,255,0.06); color: var(--muted); border: 1px solid var(--border); }
+
+/* Charts row */
+.charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px;
+}
+.chart-title { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; }
+
+/* Mini bars */
+.bar-list { display: flex; flex-direction: column; gap: 12px; }
+.bar-row { display: flex; align-items: center; gap: 12px; }
+.bar-label { font-size: 13px; font-weight: 600; color: var(--text); width: 80px; flex-shrink: 0; }
+.bar-track { flex: 1; height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--green), rgba(198,255,0,0.6)); transition: width 0.6s ease; }
+.bar-val { font-size: 13px; font-weight: 700; color: var(--text); width: 30px; text-align: right; flex-shrink: 0; }
+
+/* Auth overlay */
+.auth-overlay {
+  position: fixed; inset: 0;
+  background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 999;
+}
+.auth-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 48px 40px;
+  width: 360px;
+  text-align: center;
+}
+.auth-logo { font-family: 'Bebas Neue', sans-serif; font-size: 48px; letter-spacing: 6px; background: linear-gradient(90deg, var(--green), #fff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 8px; }
+.auth-sub { font-size: 13px; color: var(--muted); font-weight: 600; letter-spacing: 1px; margin-bottom: 32px; }
+.auth-input {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  outline: none;
+  margin-bottom: 12px;
+  letter-spacing: 2px;
+}
+.auth-input:focus { border-color: rgba(198,255,0,0.3); }
+.auth-btn {
+  width: 100%;
+  background: linear-gradient(135deg, var(--green), #9ed600);
+  color: #000;
+  border: none;
+  border-radius: 10px;
+  padding: 14px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  font-weight: 900;
+  cursor: pointer;
+}
+.auth-err { color: var(--danger); font-size: 13px; margin-top: 10px; display: none; }
+
+/* Loading */
+.loading { display: flex; align-items: center; justify-content: center; padding: 60px; color: var(--muted); font-size: 14px; font-weight: 600; gap: 10px; }
+.spinner { width: 18px; height: 18px; border: 2px solid rgba(198,255,0,0.2); border-top-color: var(--green); border-radius: 50%; animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.last-updated { font-size: 12px; color: var(--muted); font-weight: 500; }
+</style>
+</head>
+<body>
+
+<!-- Auth overlay -->
+<div class="auth-overlay" id="authOverlay">
+  <div class="auth-box">
+    <div class="auth-logo">GAINS</div>
+    <div class="auth-sub">ADMIN PANEL</div>
+    <input class="auth-input" type="password" id="tokenInput" placeholder="••••••••••" autocomplete="off">
+    <button class="auth-btn" onclick="doAuth()">Войти</button>
+    <div class="auth-err" id="authErr">Неверный токен</div>
+  </div>
+</div>
+
+<!-- Main app -->
+<div id="app" style="display:none">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:16px">
+      <div class="logo">GAINS <span>ADMIN</span></div>
+    </div>
+    <div class="topbar-right">
+      <div class="badge-live">● LIVE</div>
+      <div class="last-updated" id="lastUpdated">—</div>
+      <button class="refresh-btn" onclick="loadData()">↻ Обновить</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div id="content">
+      <div class="loading"><div class="spinner"></div> Загрузка...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = 'https://web-production-0031f.up.railway.app';
+let TOKEN = '';
+
+function doAuth() {
+  const val = document.getElementById('tokenInput').value.trim();
+  if (!val) return;
+  TOKEN = val;
+  // Test the token
+  fetch(`${API}/admin/stats?token=${encodeURIComponent(TOKEN)}`)
+    .then(r => {
+      if (r.status === 403) throw new Error('forbidden');
+      return r.json();
+    })
+    .then(data => {
+      document.getElementById('authOverlay').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      localStorage.setItem('gains_admin_token', TOKEN);
+      renderStats(data);
+      loadUsers();
+    })
+    .catch(() => {
+      document.getElementById('authErr').style.display = 'block';
+    });
+}
+
+function loadData() {
+  Promise.all([
+    fetch(`${API}/admin/stats?token=${encodeURIComponent(TOKEN)}`).then(r => r.json()),
+    fetch(`${API}/admin/users?token=${encodeURIComponent(TOKEN)}&limit=200`).then(r => r.json()),
+  ]).then(([stats, users]) => {
+    renderStats(stats);
+    renderUsers(users);
+    document.getElementById('lastUpdated').textContent = 'обновлено ' + new Date().toLocaleTimeString('ru');
+  });
+}
+
+function loadUsers() {
+  fetch(`${API}/admin/users?token=${encodeURIComponent(TOKEN)}&limit=200`)
+    .then(r => r.json())
+    .then(data => renderUsers(data));
+}
+
+function renderStats(s) {
+  const convRate = s.total_users > 0 ? ((s.premium_users / s.total_users) * 100).toFixed(1) : 0;
+  const revenue = s.premium_users * 290;
+  document.getElementById('content').innerHTML = `
+    <div class="stats-grid">
+      <div class="stat-card green">
+        <div class="stat-label">Всего пользователей</div>
+        <div class="stat-value">${s.total_users}</div>
+        <div class="stat-sub"><span class="up">+${s.new_today}</span> сегодня · +${s.new_week} за неделю</div>
+      </div>
+      <div class="stat-card white">
+        <div class="stat-label">Премиум</div>
+        <div class="stat-value">${s.premium_users}</div>
+        <div class="stat-sub">конверсия ${convRate}%</div>
+      </div>
+      <div class="stat-card dim">
+        <div class="stat-label">Триал (активные)</div>
+        <div class="stat-value">${s.trial_users}</div>
+        <div class="stat-sub">в пробном периоде</div>
+      </div>
+      <div class="stat-card dim">
+        <div class="stat-label">Активны сегодня</div>
+        <div class="stat-value">${s.active_today}</div>
+        <div class="stat-sub">${s.workouts_today} тренировок</div>
+      </div>
+      <div class="stat-card dim">
+        <div class="stat-label">Всего тренировок</div>
+        <div class="stat-value">${s.total_workouts}</div>
+        <div class="stat-sub">${s.total_logs} подходов записано</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-label">MRR (оценка)</div>
+        <div class="stat-value">${revenue}₽</div>
+        <div class="stat-sub">при цене 290₽/мес</div>
+      </div>
+    </div>
+
+    <div class="charts-row">
+      <div class="chart-card">
+        <div class="chart-title">Воронка</div>
+        <div class="bar-list" id="funnelBars"></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Активность</div>
+        <div class="bar-list" id="activityBars"></div>
+      </div>
+    </div>
+
+    <div class="section-title">Пользователи</div>
+    <div class="table-wrap">
+      <div id="usersTable"><div class="loading"><div class="spinner"></div> Загрузка...</div></div>
+    </div>
+  `;
+
+  // Funnel bars
+  const max = Math.max(s.total_users, 1);
+  document.getElementById('funnelBars').innerHTML = [
+    { label: 'Всего', val: s.total_users, pct: 100 },
+    { label: 'Триал', val: s.trial_users, pct: Math.round(s.trial_users/max*100) },
+    { label: 'Премиум', val: s.premium_users, pct: Math.round(s.premium_users/max*100) },
+  ].map(r => `
+    <div class="bar-row">
+      <div class="bar-label">${r.label}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${r.pct}%"></div></div>
+      <div class="bar-val">${r.val}</div>
+    </div>
+  `).join('');
+
+  document.getElementById('activityBars').innerHTML = [
+    { label: 'Тренировки', val: s.total_workouts, pct: 100 },
+    { label: 'Сегодня', val: s.workouts_today, pct: Math.min(Math.round(s.workouts_today/Math.max(s.total_workouts,1)*100*10),100) },
+    { label: 'Подходы', val: s.total_logs, pct: 100 },
+    { label: 'Замеры', val: s.total_measurements, pct: Math.min(Math.round(s.total_measurements/Math.max(s.total_workouts,1)*100),100) },
+  ].map(r => `
+    <div class="bar-row">
+      <div class="bar-label">${r.label}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${r.pct}%"></div></div>
+      <div class="bar-val">${r.val}</div>
+    </div>
+  `).join('');
+}
+
+function renderUsers(data) {
+  const users = data.users || [];
+  if (!users.length) {
+    document.getElementById('usersTable').innerHTML = '<div class="loading">Нет пользователей</div>';
+    return;
+  }
+  const goalMap = { mass: 'Масса', weight_loss: 'Похудение', strength: 'Сила', endurance: 'Выносливость' };
+  const locMap = { gym: '🏋️ Зал', home: '🏠 Дома' };
+  const levelMap = { beginner: 'Новичок', intermediate: 'Средний', advanced: 'Продвинутый' };
+
+  document.getElementById('usersTable').innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>TG ID</th>
+          <th>Статус</th>
+          <th>Место</th>
+          <th>Цель</th>
+          <th>Уровень</th>
+          <th>Дней/нед</th>
+          <th>Тренировок</th>
+          <th>Зарегистрирован</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${users.map(u => {
+          const status = u.is_premium ? 'premium' : (u.trial_start ? 'trial' : 'free');
+          const statusLabel = { premium: '⭐ Премиум', trial: '🔥 Триал', free: 'Free' }[status];
+          const created = u.created_at ? new Date(u.created_at).toLocaleDateString('ru') : '—';
+          return `<tr>
+            <td style="font-family:monospace;font-size:12px;color:var(--muted)">${u.tg_id}</td>
+            <td><span class="badge ${status}">${statusLabel}</span></td>
+            <td class="muted">${locMap[u.location] || u.location || '—'}</td>
+            <td class="muted">${goalMap[u.goal] || u.goal || '—'}</td>
+            <td class="muted">${levelMap[u.level] || u.level || '—'}</td>
+            <td class="muted">${u.days_per_week || '—'}</td>
+            <td style="font-weight:700;color:var(--green)">${u.workout_count || 0}</td>
+            <td class="muted">${created}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+// Try saved token
+const saved = localStorage.getItem('gains_admin_token');
+if (saved) {
+  TOKEN = saved;
+  document.getElementById('tokenInput').value = saved;
+  doAuth();
+}
+
+document.getElementById('tokenInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doAuth();
+});
+
+// Auto-refresh every 60s
+setInterval(() => { if (TOKEN) loadData(); }, 60000);
+</script>
+</body>
+</html>
