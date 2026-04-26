@@ -240,7 +240,12 @@ def get_today_workout(tg_id: int):
             logs = conn.execute(
                 "SELECT * FROM exercise_logs WHERE workout_id=?", (workout["id"],)
             ).fetchall()
-            return {"workout": dict(workout), "logs": [dict(l) for l in logs]}
+            # compute next split day
+            completed_count = conn.execute(
+                "SELECT COUNT(*) as cnt FROM workouts WHERE tg_id=? AND completed=1", (tg_id,)
+            ).fetchone()["cnt"]
+            next_split = get_split_day(user["days_per_week"], completed_count)
+            return {"workout": dict(workout), "logs": [dict(l) for l in logs], "next_split_day": next_split}
 
         # How many workouts done total
         total_workouts = conn.execute(
