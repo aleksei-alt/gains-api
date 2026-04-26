@@ -534,3 +534,118 @@ def get_notify_due(hour: int):
                     "total": total
                 })
     return {"users": result}
+
+
+# --- TELEGRAM BOT WEBHOOK ---
+import httpx
+
+BOT_TOKEN = os.getenv("BOT_TOKEN", "")
+TG_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
+TMA_URL = "https://gains-tma.vercel.app/"
+CHANNEL_URL = os.getenv("GAINS_CHANNEL", "")  # set when channel exists
+SUPPORT_USERNAME = os.getenv("SUPPORT_USERNAME", "@gainsfitnessbot")  # update to support account
+
+async def tg_send(chat_id: int, text: str, reply_markup: dict = None):
+    payload = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
+    if reply_markup:
+        payload["reply_markup"] = json.dumps(reply_markup)
+    async with httpx.AsyncClient() as client:
+        await client.post(f"{TG_API}/sendMessage", json=payload, timeout=10)
+
+async def tg_answer_callback(callback_id: str, text: str = ""):
+    async with httpx.AsyncClient() as client:
+        await client.post(f"{TG_API}/answerCallbackQuery",
+            json={"callback_query_id": callback_id, "text": text}, timeout=5)
+
+
+@app.post("/webhook")
+async def telegram_webhook(request: dict):
+    # Handle message
+    msg = request.get("message", {})
+    cb = request.get("callback_query", {})
+
+    if msg:
+        chat_id = msg.get("chat", {}).get("id")
+        text = msg.get("text", "")
+        first_name = msg.get("from", {}).get("first_name", "")
+
+        if text.startswith("/start"):
+            keyboard = {
+                "inline_keyboard": [
+                    [{"text": "💪 Открыть GAINS", "web_app": {"url": TMA_URL}}],
+                    [{"text": "❓ Помощь", "callback_data": "help"},
+                     {"text": "💳 Подписка", "callback_data": "sub"}],
+                    [{"text": "📢 Канал", "url": CHANNEL_URL}] if CHANNEL_URL else
+                    [{"text": "✉️ Поддержка", "url": f"https://t.me/{SUPPORT_USERNAME.lstrip('@')}"}]
+                ]
+            }
+            await tg_send(chat_id,
+                f"Привет, {first_name}! 👋\n\n"
+                f"<b>GAINS</b> — тренировочный партнёр который помнит каждый твой вес.\n\n"
+                f"🔥 <b>Как работает:</b>\n"
+                f"• Скажи цель и место тренировки\n"
+                f"• Получай персональную программу каждый день\n"
+                f"• Прогрессия весов автоматически\n\n"
+                f"Первые 3 тренировки бесплатно 👇",
+                keyboard)
+
+        elif text.startswith("/help") or text.startswith("/faq"):
+            faq_text = (
+                "❓ <b>Частые вопросы</b>\n\n"
+                "<b>Когда следующая тренировка?</b>\n"
+                "На следующий день — приложение само откроется с новой программой.\n\n"
+                "<b>Могу тренироваться каждый день?</b>\n"
+                "Программа рассчитана на выбранное тобой количество дней (3-5). В остальные дни — отдых.\n\n"
+                "<b>Как оплатить подписку?</b>\n"
+                "Через Telegram Stars прямо в приложении. Профиль → Оформить подписку.\n\n"
+                "<b>Работает без интернета?</b>\n"
+                "Нет, нужно подключение для загрузки тренировки.\n\n"
+                "<b>Как отменить подписку?</b>\n"
+                "Настройки Telegram → Подписки → GAINS.\n\n"
+                f"Остались вопросы? Пиши в поддержку: {SUPPORT_USERNAME}"
+            )
+            await tg_send(chat_id, faq_text)
+
+        elif text.startswith("/support"):
+            await tg_send(chat_id,
+                f"✉️ <b>Поддержка GAINS</b>\n\n"
+                f"Пиши нам: {SUPPORT_USERNAME}\n\n"
+                f"Отвечаем в течение 24 часов.",
+                {"inline_keyboard": [[
+                    {"text": "Написать в поддержку",
+                     "url": f"https://t.me/{SUPPORT_USERNAME.lstrip('@')}"}
+                ]]}
+            )
+
+    elif cb:
+        chat_id = cb.get("from", {}).get("id")
+        data = cb.get("data", "")
+        await tg_answer_callback(cb["id"])
+
+        if data == "help":
+            await tg_send(chat_id, "Открой /help для полного FAQ")
+        elif data == "sub":
+            await tg_send(chat_id,
+                "💳 <b>Подписка GAINS</b>\n\n"
+                "390₽/мес (~200 ⭐ Stars)\n\n"
+                "Оформить можно прямо в приложении:\n"
+                "Профиль → кнопка «Оформить подписку»",
+                {"inline_keyboard": [[
+                    {"text": "💪 Открыть приложение", "web_app": {"url": TMA_URL}}
+                ]]}
+            )
+
+    return {"ok": True}
+
+
+@app.on_event("startup")
+async def set_webhook():
+    """Auto-register webhook on startup."""
+    if not BOT_TOKEN:
+        return
+    railway_url = os.getenv("RAILWAY_PUBLIC_DOMAIN", "")
+    if railway_url:
+        webhook_url = f"https://{railway_url}/webhook"
+        async with httpx.AsyncClient() as client:
+            await client.post(f"{TG_API}/setWebhook",
+                json={"url": webhook_url, "drop_pending_updates": True}, timeout=10)
