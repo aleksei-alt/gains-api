@@ -831,7 +831,7 @@
 
 <!-- ONBOARDING -->
 <div id="onboarding" class="screen active">
-  <div style="position:absolute;top:6px;right:10px;font-size:10px;opacity:0.25;color:white;z-index:99">v17</div>
+  <div style="position:absolute;top:6px;right:10px;font-size:10px;opacity:0.25;color:white;z-index:99">v18</div>
   <div>
     <div class="onboard-header">
       <div class="logo">GAINS</div>
@@ -979,7 +979,6 @@
         </div>
       </div>
     </div>
-  </div>
 
     <!-- Step 6: Notify time -->
     <div class="onboard-step" id="step-notify">
@@ -1433,12 +1432,15 @@ async function loadProgress() {
       data.sessions.forEach(s => {
         const d = new Date(s.date + 'T00:00:00');
         const label = `${days[d.getDay()]}, ${d.getDate()} ${['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'][d.getMonth()]}`;
-        const exNames = s.exercises.join(' · ') + (s.exercise_count > 3 ? ` +${s.exercise_count - 3}` : '');
+        const logsHtml = (s.logs || []).map(l => {
+          const w = l.weight > 0 ? ` · ${l.weight}кг` : '';
+          return `<div style="font-size:13px;color:var(--text-2);padding:4px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between"><span>${l.exercise}</span><span style="color:var(--accent);font-weight:700;white-space:nowrap;margin-left:8px">${l.sets}×${l.reps}${w}</span></div>`;
+        }).join('');
+        const extra = s.exercise_count > (s.logs||[]).length ? `<div style="font-size:12px;color:var(--text-3);margin-top:6px">+${s.exercise_count - (s.logs||[]).length} упр. без логов</div>` : '';
         sessionsHtml += `
         <div class="session-card">
-          <div class="session-date">${label}</div>
-          <div class="session-exercises">${exNames}</div>
-          <div class="session-count">${s.exercise_count} упражнений</div>
+          <div class="session-date">${label} · ${s.exercise_count} упражнений</div>
+          <div style="margin-top:8px">${logsHtml}${extra}</div>
         </div>`;
       });
     } else {

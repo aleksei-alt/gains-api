@@ -517,10 +517,14 @@ def get_progress(tg_id: int):
         for w in recent_workouts:
             try:
                 exs = json.loads(w["exercises"])
+                logs = fetchall(conn,
+                    "SELECT exercise, sets, reps, weight FROM exercise_logs WHERE workout_id=? ORDER BY id",
+                    (w["id"],))
                 sessions.append({
                     "date": w["date"],
                     "exercise_count": len(exs),
-                    "exercises": [e["exercise"] for e in exs[:3]]
+                    "exercises": [e["exercise"] for e in exs[:3]],
+                    "logs": logs
                 })
             except Exception:
                 pass
