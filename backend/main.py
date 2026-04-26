@@ -610,7 +610,7 @@ async def tg_answer_cb(cb_id: str, text: str = ""):
 
 
 PRICE_RUB = 290
-PRICE_STARS = 290
+PRICE_STARS = 219
 
 START_TEXT = (
     "Твой тренировочный трекер.\n\n"
