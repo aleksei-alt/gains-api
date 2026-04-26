@@ -165,6 +165,11 @@ class BodyMeasurement(BaseModel):
     chest: Optional[float] = None
 
 
+@app.get("/")
+def health():
+    return {"status": "ok", "service": "gains-api"}
+
+
 @app.post("/users/setup")
 def setup_user(data: UserSetup):
     with db() as conn:
