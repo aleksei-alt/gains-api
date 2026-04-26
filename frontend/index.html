@@ -831,7 +831,7 @@
 
 <!-- ONBOARDING -->
 <div id="onboarding" class="screen active">
-  <div style="position:absolute;top:6px;right:10px;font-size:10px;opacity:0.25;color:white;z-index:99">v18</div>
+  <div style="position:absolute;top:6px;right:10px;font-size:10px;opacity:0.25;color:white;z-index:99">v19</div>
   <div>
     <div class="onboard-header">
       <div class="logo">GAINS</div>
@@ -1263,6 +1263,24 @@ async function loadToday() {
 }
 
 function renderWorkout(data) {
+  // Rest day screen
+  if (data.is_rest_day) {
+    const done = data.workouts_this_week || 0;
+    const total = data.days_per_week || 3;
+    document.getElementById('workout-content').innerHTML = `
+      <div class="rest-day">
+        <div class="icon">🛌</div>
+        <h2>День отдыха</h2>
+        <p>На этой неделе уже ${done} из ${total} тренировок.<br>Мышцы растут во время восстановления.</p>
+        <div style="background:var(--card);border-radius:16px;padding:16px;margin-top:20px;text-align:left">
+          <div style="font-size:12px;color:var(--text-3);margin-bottom:8px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Сегодня</div>
+          <div style="font-size:15px;font-weight:600;color:var(--text-2)">💧 Пей воду · 🥩 Белок · 😴 Сон 8ч</div>
+        </div>
+        <button onclick="forceNewWorkout()" style="margin-top:20px;width:100%;background:transparent;border:1.5px solid var(--border2);border-radius:16px;padding:14px;color:var(--text-2);font-size:14px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">Всё равно потренироваться →</button>
+      </div>`;
+    return;
+  }
+
   const workout = data.workout;
   let exercises = [];
   try { exercises = JSON.parse(workout.exercises); } catch { exercises = []; }
@@ -1288,8 +1306,8 @@ function renderWorkout(data) {
           <div style="font-size:12px;color:var(--text-3);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">Следующая тренировка</div>
           <div style="font-size:17px;font-weight:700;margin-bottom:4px">${tomLabel}</div>
           ${nextSplit ? `<div style="font-size:14px;color:var(--accent);font-weight:600">${nextSplit}</div>` : ''}
-          <div style="font-size:13px;color:var(--text-3);margin-top:8px">Приложение откроется с новой программой</div>
         </div>
+        <button onclick="forceNewWorkout()" style="margin-top:12px;width:100%;background:transparent;border:1.5px solid var(--border2);border-radius:16px;padding:14px;color:var(--text-2);font-size:14px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif">🔄 Ещё одна тренировка сегодня</button>
       </div>`;
     return;
   }
@@ -1692,6 +1710,25 @@ async function saveMeasurement() {
   }).catch(() => {});
   showToast('Замеры сохранены!', 'success');
   loadMeasurements();
+}
+
+async function forceNewWorkout() {
+  document.getElementById('workout-content').innerHTML = `
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <div style="color:var(--text-2)">Составляю тренировку...</div>
+    </div>`;
+  state.loggedExercises = new Set();
+  try {
+    const r = await fetchWithTimeout(`${API}/workout/today/${TG_ID}/new`, {method:'POST'}, 20000);
+    const data = await r.json();
+    state.workout = data.workout;
+    state.splitDay = data.split_day || '';
+    renderWorkout(data);
+  } catch(e) {
+    document.getElementById('workout-content').innerHTML =
+      `<div class="loading-state"><div style="color:var(--danger)">Ошибка. Попробуй ещё раз.</div></div>`;
+  }
 }
 
 function toggleTip(idx) {

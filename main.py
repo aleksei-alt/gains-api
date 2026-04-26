@@ -332,7 +332,10 @@ def get_today_workout(tg_id: int):
         if not user:
             raise HTTPException(404, "User not found")
 
-        workout = fetchone(conn, "SELECT * FROM workouts WHERE tg_id=? AND date=?", (tg_id, today))
+        # Latest workout today (allows multiple per day)
+        workout = fetchone(conn,
+            "SELECT * FROM workouts WHERE tg_id=? AND date=? ORDER BY id DESC",
+            (tg_id, today))
 
         if workout:
             logs = fetchall(conn, "SELECT * FROM exercise_logs WHERE workout_id=?", (workout["id"],))
@@ -341,28 +344,48 @@ def get_today_workout(tg_id: int):
             next_split = get_split_day(user["days_per_week"], completed_count)
             return {"workout": workout, "logs": logs,
                     "split_day": workout.get("split_day") or "Тренировка",
-                    "next_split_day": next_split}
+                    "next_split_day": next_split,
+                    "is_rest_day": False}
 
-        total_workouts = fetchone(conn,
-            "SELECT COUNT(*) as cnt FROM workouts WHERE tg_id=? AND completed=1", (tg_id,))["cnt"]
+        # Check weekly quota for rest day detection
+        monday = (date.today() - timedelta(days=date.today().weekday())).isoformat()
+        workouts_this_week = fetchone(conn,
+            "SELECT COUNT(*) as cnt FROM workouts WHERE tg_id=? AND completed=1 AND date >= ?",
+            (tg_id, monday))["cnt"]
 
-        history = fetchall(conn,
-            """SELECT el.exercise, el.weight, el.reps, el.sets, el.logged_at
-               FROM exercise_logs el JOIN workouts w ON el.workout_id = w.id
-               WHERE el.tg_id=? ORDER BY el.logged_at DESC LIMIT 30""", (tg_id,))
+        if workouts_this_week >= user["days_per_week"]:
+            return {"workout": None, "is_rest_day": True,
+                    "workouts_this_week": workouts_this_week,
+                    "days_per_week": user["days_per_week"]}
 
-        split_day = get_split_day(user["days_per_week"], total_workouts)
-        workout_plan = generate_workout(user, history, split_day)
+        return _generate_and_return_workout(tg_id, today, user, conn)
 
-        db_execute(conn, "INSERT INTO workouts (tg_id, date, exercises, split_day) VALUES (?,?,?,?)",
-            (tg_id, today, workout_plan, split_day))
 
-        if USE_POSTGRES:
-            new_workout = fetchone(conn, "SELECT * FROM workouts WHERE tg_id=? AND date=? ORDER BY id DESC LIMIT 1", (tg_id, today))
-        else:
-            new_workout = fetchone(conn, "SELECT * FROM workouts WHERE tg_id=? AND date=?", (tg_id, today))
+def _generate_and_return_workout(tg_id: int, today: str, user: dict, conn):
+    total_workouts = fetchone(conn,
+        "SELECT COUNT(*) as cnt FROM workouts WHERE tg_id=? AND completed=1", (tg_id,))["cnt"]
+    history = fetchall(conn,
+        """SELECT el.exercise, el.weight, el.reps, el.sets, el.logged_at
+           FROM exercise_logs el JOIN workouts w ON el.workout_id = w.id
+           WHERE el.tg_id=? ORDER BY el.logged_at DESC LIMIT 30""", (tg_id,))
+    split_day = get_split_day(user["days_per_week"], total_workouts)
+    workout_plan = generate_workout(user, history, split_day)
+    db_execute(conn, "INSERT INTO workouts (tg_id, date, exercises, split_day) VALUES (?,?,?,?)",
+        (tg_id, today, workout_plan, split_day))
+    new_workout = fetchone(conn,
+        "SELECT * FROM workouts WHERE tg_id=? AND date=? ORDER BY id DESC", (tg_id, today))
+    return {"workout": new_workout, "split_day": split_day, "logs": [], "is_rest_day": False}
 
-        return {"workout": new_workout, "split_day": split_day, "logs": []}
+
+@app.post("/workout/today/{tg_id}/new")
+def new_workout_today(tg_id: int):
+    """Force create a new workout for today (repeat or override rest day)."""
+    today = date.today().isoformat()
+    with get_db() as conn:
+        user = fetchone(conn, "SELECT * FROM users WHERE tg_id=?", (tg_id,))
+        if not user:
+            raise HTTPException(404, "User not found")
+        return _generate_and_return_workout(tg_id, today, user, conn)
 
 
 def generate_workout(user: dict, history: list, split_day: str) -> str:
