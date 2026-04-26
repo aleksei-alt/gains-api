@@ -440,10 +440,27 @@ def get_progress(tg_id: int):
             "SELECT COUNT(*) as cnt FROM workouts WHERE tg_id=? AND completed=1", (tg_id,)
         ).fetchone()
 
+        recent_workouts = conn.execute(
+            "SELECT id, date, exercises FROM workouts WHERE tg_id=? AND completed=1 ORDER BY date DESC LIMIT 10",
+            (tg_id,)
+        ).fetchall()
+        sessions = []
+        for w in recent_workouts:
+            try:
+                exs = json.loads(w["exercises"])
+                sessions.append({
+                    "date": w["date"],
+                    "exercise_count": len(exs),
+                    "exercises": [e["exercise"] for e in exs[:3]]
+                })
+            except Exception:
+                pass
+
         return {
             "streak": streak,
             "total_workouts": total["cnt"],
-            "top_exercises": [dict(e) for e in exercises]
+            "top_exercises": [dict(e) for e in exercises],
+            "sessions": sessions
         }
 
 
